@@ -2,10 +2,8 @@ package org.openelisglobal.testconfiguration.controller;
 
 import java.util.List;
 import java.util.Locale;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
 import org.openelisglobal.common.log.LogEvent;
@@ -69,7 +67,7 @@ public class UomCreateController extends BaseController {
 
     @RequestMapping(value = "/UomCreate", method = RequestMethod.POST)
     public ModelAndView postUomCreate(HttpServletRequest request, @ModelAttribute("form") @Valid UomCreateForm form,
-            BindingResult result)  {
+            BindingResult result) {
         if (result.hasErrors()) {
             saveErrors(result);
             setupDisplayItems(form);
@@ -109,7 +107,7 @@ public class UomCreateController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "uomCreateDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/UomCreate.do";
+            return "redirect:/UomCreate";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "uomCreateDefinition";
         } else {

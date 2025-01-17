@@ -1,10 +1,8 @@
 package org.openelisglobal.notification.controller;
 
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.notification.form.TestNotificationConfigForm;
@@ -72,21 +70,19 @@ public class TestNotificationConfigController extends BaseController {
 
     @PostMapping("/TestNotificationConfig")
     public ModelAndView updateNotificationConfig(HttpServletRequest request,
-            @ModelAttribute("form") @Valid TestNotificationConfigForm form,
-            BindingResult result, RedirectAttributes redirectAttributes) {
+            @ModelAttribute("form") @Valid TestNotificationConfigForm form, BindingResult result,
+            RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
             saveErrors(result);
             return displayNotificationConfig(form.getConfig().getTest().getId());
         }
         String sysUserId = this.getSysUserId(request);
 
-        testNotificationConfigService.saveTestNotificationConfigActiveStatuses(form.getConfig(), sysUserId);
+        testNotificationConfigService.saveStatusAndMessages(form.getConfig(), sysUserId);
         if (form.getEditSystemDefaultPayloadTemplate()) {
             payloadTemplateService.updatePayloadTemplateMessagesAndSubject(form.getSystemDefaultPayloadTemplate(),
                     sysUserId);
         }
-        testNotificationConfigService.updatePayloadTemplatesMessageAndSubject(form.getConfig(),
-                sysUserId);
         testNotificationConfigService.removeEmptyPayloadTemplates(form.getConfig(), sysUserId);
         redirectAttributes.addFlashAttribute(FWD_SUCCESS, true);
         return findForward(FWD_SUCCESS_INSERT, form);
@@ -97,9 +93,9 @@ public class TestNotificationConfigController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "testNotificationConfigDefinition";
         } else if (FWD_FAIL.equals(forward)) {
-            return "redirect:/TestNotificationConfigMenu.do";
+            return "redirect:/TestNotificationConfigMenu";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/TestNotificationConfigMenu.do";
+            return "redirect:/TestNotificationConfigMenu";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "testNotificationConfigDefinition";
         } else {
@@ -116,5 +112,4 @@ public class TestNotificationConfigController extends BaseController {
     protected String getPageSubtitleKey() {
         return "testnotificationconfig.browse.title";
     }
-
 }

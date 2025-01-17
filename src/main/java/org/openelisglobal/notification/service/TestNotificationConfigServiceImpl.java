@@ -2,12 +2,9 @@ package org.openelisglobal.notification.service;
 
 import java.util.List;
 import java.util.Optional;
-
-import javax.transaction.Transactional;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.common.dao.BaseDAO;
-import org.openelisglobal.common.service.BaseObjectServiceImpl;
+import org.openelisglobal.common.service.AuditableBaseObjectServiceImpl;
 import org.openelisglobal.notification.dao.TestNotificationConfigDAO;
 import org.openelisglobal.notification.valueholder.NotificationConfigOption;
 import org.openelisglobal.notification.valueholder.NotificationPayloadTemplate;
@@ -15,9 +12,10 @@ import org.openelisglobal.notification.valueholder.TestNotificationConfig;
 import org.openelisglobal.test.service.TestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<TestNotificationConfig, Integer>
+public class TestNotificationConfigServiceImpl extends AuditableBaseObjectServiceImpl<TestNotificationConfig, Integer>
         implements TestNotificationConfigService {
 
     @Autowired
@@ -44,8 +42,8 @@ public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<Tes
 
     @Override
     @Transactional
-    public void saveTestNotificationConfigActiveStatuses(TestNotificationConfig targetTestNotificationConfig,
-            String sysUserId) {
+    public TestNotificationConfig saveTestNotificationConfigActiveStatuses(
+            TestNotificationConfig targetTestNotificationConfig, String sysUserId) {
         TestNotificationConfig oldConfig;
         if (targetTestNotificationConfig.getId() != null) {
             oldConfig = get(targetTestNotificationConfig.getId());
@@ -64,8 +62,7 @@ public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<Tes
         oldConfig.getProviderEmail().setActive(targetTestNotificationConfig.getProviderEmail().getActive());
         oldConfig.getProviderSMS().setActive(targetTestNotificationConfig.getProviderSMS().getActive());
         oldConfig.setSysUserId(sysUserId);
-        save(oldConfig);
-
+        return save(oldConfig);
     }
 
     @Override
@@ -75,7 +72,6 @@ public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<Tes
         for (TestNotificationConfig targetTestNotificationConfig : targetTestNotificationConfigs) {
             saveTestNotificationConfigActiveStatuses(targetTestNotificationConfig, sysUserId);
         }
-
     }
 
     @Override
@@ -98,7 +94,6 @@ public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<Tes
             }
             save(oldConfig);
         }
-
     }
 
     private boolean testDefaultEmpty(NotificationPayloadTemplate notificationPayloadTemplate) {
@@ -142,8 +137,8 @@ public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<Tes
                 } else {
                     oldPayloadTemplate.setSubjectTemplate(newPayloadTemplate.getSubjectTemplate());
                     oldPayloadTemplate.setMessageTemplate(newPayloadTemplate.getMessageTemplate());
+                    oldPayloadTemplate.setSysUserId(sysUserId);
                 }
-                oldPayloadTemplate.setSysUserId(sysUserId);
             }
         } else {
             oldConfig = newTestNotificationConfig;
@@ -162,4 +157,11 @@ public class TestNotificationConfigServiceImpl extends BaseObjectServiceImpl<Tes
         return baseDAO.getForConfigOption(configOptionId);
     }
 
+    @Override
+    @Transactional
+    public void saveStatusAndMessages(TestNotificationConfig config, String sysUserId) {
+        TestNotificationConfig savedConfig = saveTestNotificationConfigActiveStatuses(config, sysUserId);
+        config.setId(savedConfig.getId());
+        updatePayloadTemplatesMessageAndSubject(config, sysUserId);
+    }
 }

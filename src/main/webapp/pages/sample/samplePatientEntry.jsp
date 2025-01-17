@@ -1,6 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" %>
 <%@ page import="org.openelisglobal.common.action.IActionConstants,
-                 org.openelisglobal.common.util.SystemConfiguration,
                  org.openelisglobal.common.util.ConfigurationProperties,
                  org.openelisglobal.common.util.ConfigurationProperties.Property,
                  org.openelisglobal.common.formfields.FormFields,
@@ -15,8 +14,6 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 
 <%@ taglib prefix="ajax" uri="/tags/ajaxtags" %>
-<%@ taglib uri="http://tiles.apache.org/tags-tiles" prefix="tiles"%>
-
 
 <c:set var="formName" value="${form.formName}" />
 <c:set var="entryDate" value="${form.currentDate}" />
@@ -29,8 +26,10 @@
     boolean useProviderInfo = FormFields.getInstance().useField(FormFields.Field.ProviderInfo);
     boolean patientRequired = FormFields.getInstance().useField(FormFields.Field.PatientRequired);
     boolean trackPayment = ConfigurationProperties.getInstance().isPropertyValueEqual(Property.TRACK_PATIENT_PAYMENT, "true");
-    boolean requesterLastNameRequired = FormFields.getInstance().useField(Field.SampleEntryRequesterLastNameRequired);
+    boolean requesterPersonRequired = FormFields.getInstance().useField(Field.SampleEntryRequesterPersonRequired);
 	boolean acceptExternalOrders = ConfigurationProperties.getInstance().isPropertyValueEqual(Property.ACCEPT_EXTERNAL_ORDERS, "true");
+    boolean restrictNewProviderEntries = ConfigurationProperties.getInstance().isPropertyValueEqual(Property.restrictFreeTextProviderEntry, "true");
+    boolean restrictNewReferringSiteEntries = ConfigurationProperties.getInstance().isPropertyValueEqual(Property.restrictFreeTextRefSiteEntry, "true");
 %>
 
 
@@ -54,15 +53,30 @@
 
 var useSTNumber = <%= useSTNumber %>;
 var useMothersName = <%= useMothersName %>;
-var requesterLastNameRequired = <%= requesterLastNameRequired %>;
+var requesterPersonRequired = <%= requesterPersonRequired %>;
 var acceptExternalOrders = <%= acceptExternalOrders %>;
+var restrictNewReferringSiteEntries = <%= restrictNewReferringSiteEntries %>;
 var dirty = false;
 var invalidSampleElements = [];
 var requiredFields = new Array("labNo", "receivedDateForDisplay" );
+var currentReferalDiv ;
+var currentReferalDivSelector ;
 
-if( requesterLastNameRequired ){
-    requiredFields.push("providerLastNameID");
+if( requesterPersonRequired ){
+	if (<%=restrictNewProviderEntries%>) {
+		requiredFields.push("providerPersonId");
+	} else {
+		requiredFields.push("providerLastNameID");
+	}
+    
 }
+
+if (<%=restrictNewReferringSiteEntries%>) {
+		requiredFields.push("requesterId");
+} else {
+		requiredFields.push("requesterName");
+}
+
 <% if( FormFields.getInstance().useField(Field.SampleEntryUseRequestDate)){ %>
     requiredFields.push("requestDate");
 <% } %>
@@ -245,6 +259,7 @@ function addPatientInfo(  ){
 }
 
 function showHideSection(button, targetId){
+    targetId = targetId+button.name
     if( button.value == "+" ){
         showSection(button, targetId);
     }else{
@@ -310,14 +325,14 @@ function capitalizeValue( text){
 
 function checkOrderReferral(){
 
-	var value = jQuery("#externalOrderNumber").val()
+    var value = jQuery("#externalOrderNumber").val()
     getLabOrder(value, processLabOrderSuccess);
     showSection( $("orderSectionId"), 'orderDisplay');
 }
 
-function clearOrderData() {
-
-    removeAllRows();
+function clearOrderData() { 
+    var addTestTable = document.getElementsByClassName("addTestTable")[1];
+	var addPanelTable = document.getElementsByClassName("addPanelTable")[1];
     clearTable(addTestTable);
     clearTable(addPanelTable);
     clearSearchResultTable();
@@ -336,7 +351,7 @@ function processLabOrderSuccess(xhr){
     <c:if test="${param.attemptAutoSave}">
 	<c:choose>
 	<c:when test="${not empty param.labNumber}">
-		jQuery('#labNo').val('${param.labNumber}');
+		jQuery('#labNo').val('<spring:escapeBody javaScriptEscape="true">${param.labNumber}</spring:escapeBody>');
 		setOrderModified();
 	</c:when>
 	<c:otherwise>
@@ -368,15 +383,17 @@ function processLabOrderSuccess(xhr){
         }
 
         var requestingOrg = order.getElementsByTagName('requestingOrg');
-        if (requestingOrg) {
-            parseRequestingOrg(requestingOrg);
-        }
-
         var location = order.getElementsByTagName('location');
-        if (location && !jQuery("#requesterId").val()) {
-            parseLocation(location);
+        
+       if (restrictNewReferringSiteEntries) {
+            if (requestingOrg) {
+                parseRequestingOrg(requestingOrg);
+            }
+            if (location && !jQuery("#requesterId").val()) {
+                parseLocation(location);
+            }
         }
-
+        
         var useralert = order.getElementsByTagName("user_alert");
         var alertMessage = "";
         if (useralert) {
@@ -398,9 +415,7 @@ function processLabOrderSuccess(xhr){
         var crosstests = order.getElementsByTagName("crosstest");
         parseCrossTests(crosstests, crossSampleTypeMap, crossSampleTypeOrderMap);
 
-        showSection( $("samplesSectionId"), 'samplesDisplay');
-        $("samplesAdded").show();
-
+        document.getElementsByClassName("samplesAdded")[1].show();
         notifyChangeListeners();
         testAndSetSave();
         populateCrossPanelsAndTests(CrossPanels, CrossTests, '${entryDate}');
@@ -436,9 +451,8 @@ function parsePatient(patienttag) {
 
 
 function clearRequester() {
-
-    $("providerFirstNameID").value = '';
-    $("providerLastNameID").value = '';
+	clearProvider();
+    
     $("labNo").value = '';
     $("receivedDateForDisplay").value = '${entryDate}';
     $("receivedTime").value = '';
@@ -446,7 +460,19 @@ function clearRequester() {
 
 }
 
+function clearProvider() {
+	setSelectComboboxToId('providerPersonId', '');
+}
+
 function parseRequester(requester) {
+    var requesterIdElement = requester.item(0).getElementsByTagName("personId");
+    var requesterId = "";
+    if (requesterIdElement.length > 0) {
+    	requesterId = requesterIdElement[0].firstChild.nodeValue;
+
+        setSelectComboboxToId("providerPersonId", requesterId);
+    }
+    
     var firstName = requester.item(0).getElementsByTagName("firstName");
     var first = "";
     if (firstName.length > 0) {
@@ -476,7 +502,7 @@ function parseRequestingOrg(requestingOrg) {
     if (requestingOrgId.length > 0) {
             id = requestingOrgId[0].firstChild.nodeValue;
     }
-	jQuery("#requesterId").val(id).change();
+    setSelectComboboxToId("requesterId", id);
 }
 
 function parseLocation(location) {
@@ -485,7 +511,7 @@ function parseLocation(location) {
     if (locationId.length > 0) {
             id = locationId[0].firstChild.nodeValue;
     }
-	jQuery("#requesterId").val(id).change();
+    setSelectComboboxToId("requesterId", id);
 }
 
 function parseSampletypes(sampletypes, SampleTypes) {
@@ -625,8 +651,32 @@ function  processPhoneSuccess(xhr){
     setSave();
 }
 
-function toggleReferral() {
-	jQuery("#referTestSection").toggle();
+function toggleReferral(element) {
+    var blockId = element.parentNode.id;
+    var referalId = "referTestSection_" + blockId.substring(blockId.indexOf('_')+ 1);
+    currentReferalDivSelector = "#" + referalId;
+    currentReferalDiv = document.getElementById(referalId) ;
+	currentReferalDiv.toggle();
+}
+</script>
+<script>
+jQuery(document).ready( function() {
+    addSampleTable();
+});
+var counter = 0;
+function addSampleTable(){
+    counter ++
+    var content = $("addSampleTemplate").innerHTML;
+    var newTable = document.createElement('table');
+    newTable.style = "width:100%";
+    newTable.innerHTML = content;
+    var inputShowHide = newTable.getElementsByTagName("input")[0];
+    inputShowHide.name = counter ;
+    var divSampleDisplay = newTable.getElementsByTagName("div")[0];
+    divSampleDisplay.id = "samplesDisplay_" + counter;
+    var divReferalDisplay = newTable.getElementsByClassName("referTestSection")[0];
+    divReferalDisplay.id = "referTestSection_" + counter;
+    $("samplesBlock").appendChild(newTable);
 }
 </script>
 
@@ -645,29 +695,53 @@ function toggleReferral() {
 <hr style="width:100%;height:5px"/>
 
 <% } %>
+       
+<form:checkbox id="rememberSiteAndRequester" path="rememberSiteAndRequester"/><spring:message code="label.rememberSiteRequester"/>
+<%-- <form:checkbox id="rememberSamplePanelTest" path="rememberSamplePanelTest"/> <spring:message code="label.remembersamplepaneltest"/>--%>
+       
+<br>
+<br>
             
 <div id=sampleEntryPage >
 <input type="button" name="showHide" value='-' onclick="showHideSection(this, 'orderDisplay');" id="orderSectionId">
 <%= MessageUtil.getContextualMessage("sample.entry.order.label") %>
 <span class="requiredlabel">*</span>
 
-<tiles:insertAttribute name="sampleOrder" />
+<jsp:include page="${sampleOrderFragment}"/>
 
 <hr style="width:100%;height:5px" />
-<input type="button" name="showHide" value="-" onclick="showHideSection(this, 'samplesDisplay');" id="samplesSectionId">
-<%= MessageUtil.getContextualMessage("sample.entry.sampleList.label") %>
-<span class="requiredlabel">*</span>
 
-<div id="samplesDisplay" class="colorFill" >
-    <tiles:insertAttribute name="addSample"/>
-	<form:checkbox path="useReferral" id="useReferral" onclick="toggleReferral();referralTestSelected();" value="true"/> <spring:message code="sample.entry.referral.toggle" />
-</div>
+<form:hidden  path="sampleXML"  id="sampleXML"/>
+<form:hidden path="patientEmailNotificationTestIds" id="patientEmailNotificationTestIds"/>
+<form:hidden path="patientSMSNotificationTestIds" id="patientSMSNotificationTestIds"/>
+<form:hidden path="providerEmailNotificationTestIds" id="providerEmailNotificationTestIds"/>
+<form:hidden path="providerSMSNotificationTestIds" id="providerSMSNotificationTestIds"/>
+<form:hidden path="customNotificationLogic" id="customNotificationLogic" value="false"/>
 
-<div id="referTestSection" style="display:none;">
-    <tiles:insertAttribute name="referralInfo" />
+<table id = "addSampleTemplate"  style="display:none;">
+     <tr>
+        <td >
+            <input type="button" name="showHide" value="-" onclick="showHideSection(this, 'samplesDisplay_');" id="samplesSectionId">
+            <%= MessageUtil.getContextualMessage("sample.entry.sampleList.label") %>
+            <span class="requiredlabel">*</span>
+
+            <div id="samplesDisplay_0" class="colorFill" >
+                <jsp:include page="${addSampleFragment}"/>
+                <form:checkbox path="useReferral" id="useReferral" onclick="toggleReferral(this);referralTestSelected();" value="true"/> <spring:message code="sample.entry.referral.toggle" />
+            </div>
+
+            <div id="referTestSection" class ="referTestSection" style="display:none;">
+                <jsp:include page="${referralInfoFragment}"/>
+            </div>        
+           <hr >
+        </td>
+    </tr> 
+</table>
+<div id = "samplesBlock" style="width:100%">
 </div>
 
 <br />
+<button type="button" onclick="addSampleTable();"><spring:message code="sample.entry.sample.new"/></button>
 <hr style="width:100%;height:5px" />
 
 <table style="width:100%">
@@ -707,8 +781,8 @@ function toggleReferral() {
 </table>
 
 <div id="patientInfo"  >
-    <tiles:insertAttribute name="patientInfo" />
-    <tiles:insertAttribute name="patientClinicalInfo" />
+    <jsp:include page="${patientInfoFragment}"/>
+    <jsp:include page="${patientClinicalInfoFragment}"/>
 </div>
 </div>
 
@@ -737,7 +811,7 @@ function  /*void*/ savePage()
 
     window.onbeforeunload = null; // Added to flag that formWarning alert isn't needed.
     var form = document.getElementById("mainForm");
-    form.action = "SamplePatientEntry.do";
+    form.action = "SamplePatientEntry";
     form.submit();
 }
 

@@ -2,10 +2,9 @@ package org.openelisglobal.testconfiguration.controller;
 
 import java.util.List;
 import java.util.Locale;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
+import org.openelisglobal.common.constants.Constants;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
 import org.openelisglobal.common.log.LogEvent;
@@ -59,7 +58,7 @@ public class TestSectionCreateController extends BaseController {
 
     private void setupDisplayItems(TestSectionCreateForm form) {
         form.setExistingTestUnitList(
-                DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION));
+                DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION_ACTIVE));
         form.setInactiveTestUnitList(
                 DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION_INACTIVE));
         List<TestSection> testSections = testSectionService.getAllTestSections();
@@ -81,7 +80,7 @@ public class TestSectionCreateController extends BaseController {
 
     @RequestMapping(value = "/TestSectionCreate", method = RequestMethod.POST)
     public ModelAndView postTestSectionCreate(HttpServletRequest request,
-            @ModelAttribute("form") @Valid TestSectionCreateForm form, BindingResult result)  {
+            @ModelAttribute("form") @Valid TestSectionCreateForm form, BindingResult result) {
         if (result.hasErrors()) {
             saveErrors(result);
             setupDisplayItems(form);
@@ -99,8 +98,8 @@ public class TestSectionCreateController extends BaseController {
         SystemModule resultModule = createSystemModule("LogbookResults", identifyingName, userId);
         SystemModule validationModule = createSystemModule("ResultValidation", identifyingName, userId);
 
-        Role resultsEntryRole = roleService.getRoleByName("Results entry");
-        Role validationRole = roleService.getRoleByName("Validator");
+        Role resultsEntryRole = roleService.getRoleByName(Constants.ROLE_RESULTS);
+        Role validationRole = roleService.getRoleByName(Constants.ROLE_VALIDATION);
 
         RoleModule workplanResultModule = createRoleModule(userId, workplanModule, resultsEntryRole);
         RoleModule resultResultModule = createRoleModule(userId, resultModule, resultsEntryRole);
@@ -111,9 +110,10 @@ public class TestSectionCreateController extends BaseController {
                     validationModule, workplanResultModule, resultResultModule, validationValidationModule);
         } catch (LIMSRuntimeException e) {
             LogEvent.logDebug(e);
+            return findForward(FWD_FAIL_INSERT, form);
         }
 
-        DisplayListService.getInstance().refreshList(DisplayListService.ListType.TEST_SECTION);
+        DisplayListService.getInstance().refreshList(DisplayListService.ListType.TEST_SECTION_ACTIVE);
         DisplayListService.getInstance().refreshList(DisplayListService.ListType.TEST_SECTION_INACTIVE);
 
         return findForward(FWD_SUCCESS_INSERT, form);
@@ -170,7 +170,7 @@ public class TestSectionCreateController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "testSectionCreateDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/TestSectionCreate.do";
+            return "redirect:/TestSectionCreate";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "testSectionCreateDefinition";
         } else {

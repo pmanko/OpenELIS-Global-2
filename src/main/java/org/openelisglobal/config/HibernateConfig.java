@@ -1,7 +1,8 @@
 package org.openelisglobal.config;
 
 import javax.persistence.EntityManagerFactory;
-
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
@@ -18,15 +19,18 @@ public class HibernateConfig {
     static JpaTransactionManager transactionManager;
     static LocalContainerEntityManagerFactoryBean emf;
 
+    @Autowired
+    private DataSource dataSource;
+
     @Bean
     @DependsOn("liquibase")
     public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
         if (emf == null) {
             emf = new LocalContainerEntityManagerFactoryBean();
-//            emf.setDataSource(dataSource);
+            emf.setDataSource(dataSource);
             emf.setPersistenceXmlLocation("classpath:persistence/persistence.xml");
-//            activate this once we migrate away from hbm.xmls and persistence.xml
-//            emf.setPackagesToScan("org.openelisglobal");
+            // activate this once we migrate away from hbm.xmls and persistence.xml
+            // emf.setPackagesToScan("org.openelisglobal");
         }
 
         return emf;
@@ -41,5 +45,4 @@ public class HibernateConfig {
         }
         return transactionManager;
     }
-
 }

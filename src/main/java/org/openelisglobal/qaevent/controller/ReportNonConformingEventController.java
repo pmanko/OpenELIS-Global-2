@@ -6,10 +6,8 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSInvalidConfigurationException;
@@ -65,10 +63,8 @@ public class ReportNonConformingEventController extends BaseController {
 
     @RequestMapping(value = "/ReportNonConformingEvent", method = RequestMethod.GET)
     public ModelAndView showReportNonConformingEvent(@Valid @ModelAttribute("form") NonConformingEventForm oldForm,
-            BindingResult result,
-            HttpServletRequest request)
-            throws LIMSInvalidConfigurationException, IllegalAccessException, InvocationTargetException,
-            NoSuchMethodException {
+            BindingResult result, HttpServletRequest request) throws LIMSInvalidConfigurationException,
+            IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         if (result.hasErrors()) {
             saveErrors(result);
             return findForward(FWD_FAIL, oldForm);
@@ -100,7 +96,6 @@ public class ReportNonConformingEventController extends BaseController {
         } else {
             return findForward(FWD_FAIL_INSERT, form);
         }
-
     }
 
     private void initForm(String labOrderNumber, String sampleItemIds, NonConformingEventForm form)
@@ -130,7 +125,8 @@ public class ReportNonConformingEventController extends BaseController {
             form.setSpecimens(sampleItems);
         }
 
-        form.setReportingUnits(DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION));
+        form.setReportingUnits(
+                DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION_ACTIVE));
 
         requesterService.setSampleId(sample == null ? null : sample.getId());
         form.setSite(requesterService.getReferringSiteName());
@@ -140,7 +136,6 @@ public class ReportNonConformingEventController extends BaseController {
 
         Date today = Calendar.getInstance().getTime();
         form.setReportDate(DateUtil.formatDateAsText(today));
-
     }
 
     private Sample getSampleForLabNumber(String labNumber) throws LIMSInvalidConfigurationException {
@@ -162,9 +157,9 @@ public class ReportNonConformingEventController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "reportNonConformingEventDefiniton";
         } else if (FWD_FAIL.equals(forward)) {
-            return "redirect:/HomePage.do";
+            return "redirect:/HomePage";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/ReportNonConformingEvent.do";
+            return "redirect:/ReportNonConformingEvent";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "reportNonConformingEventDefiniton";
         } else {

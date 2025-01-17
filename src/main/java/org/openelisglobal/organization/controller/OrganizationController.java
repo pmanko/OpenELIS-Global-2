@@ -5,10 +5,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang.StringUtils;
 import org.openelisglobal.address.service.AddressPartService;
@@ -73,7 +71,8 @@ public class OrganizationController extends BaseController {
         return new OrganizationForm();
     }
 
-    //    private static boolean useZip = FormFields.getInstance().useField(FormFields.Field.ZipCode);
+    // private static boolean useZip =
+    // FormFields.getInstance().useField(FormFields.Field.ZipCode);
     private static boolean useState = FormFields.getInstance().useField(FormFields.Field.OrgState);
     private static boolean useDepartment = FormFields.getInstance().useField(Field.ADDRESS_DEPARTMENT);
     private static boolean useCommune = FormFields.getInstance().useField(Field.ADDRESS_COMMUNE);
@@ -131,7 +130,7 @@ public class OrganizationController extends BaseController {
             throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         OrganizationForm newForm = resetSessionFormToType(oldForm, OrganizationForm.class);
 
-        newForm.setCancelAction("CancelOrganization.do");
+        newForm.setCancelAction("CancelOrganization");
 
         // The first job is to determine if we are coming to this action with an
         // ID parameter in the request. If there is no parameter, we are
@@ -163,12 +162,12 @@ public class OrganizationController extends BaseController {
             organization = organizationService.getNext(id);
             String newId = organization.getId();
 
-            return new ModelAndView("redirect:/Organization.do?ID=" + Encode.forUriComponent(newId) + "&startingRecNo="
+            return new ModelAndView("redirect:/Organization?ID=" + Encode.forUriComponent(newId) + "&startingRecNo="
                     + Encode.forUriComponent(start));
         } else if (FWD_PREVIOUS.equals(request.getParameter("direction"))) {
             organization = organizationService.getPrevious(id);
             String newId = organization.getId();
-            return new ModelAndView("redirect:/Organization.do?ID=" + Encode.forUriComponent(newId) + "&startingRecNo="
+            return new ModelAndView("redirect:/Organization?ID=" + Encode.forUriComponent(newId) + "&startingRecNo="
                     + Encode.forUriComponent(start));
         }
 
@@ -210,7 +209,6 @@ public class OrganizationController extends BaseController {
                     }
                 }
             }
-
         }
 
         // initialize state to MN
@@ -292,7 +290,7 @@ public class OrganizationController extends BaseController {
     public ModelAndView showUpdateOrganization(HttpServletRequest request,
             @ModelAttribute("form") @Valid OrganizationForm form, BindingResult result, SessionStatus status,
             RedirectAttributes redirectAttributes)
-                    throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+            throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
 
         setDefaultButtonAttributes(request);
         if (result.hasErrors()) {
@@ -309,13 +307,12 @@ public class OrganizationController extends BaseController {
             organization = organizationService.get(form.getId());
             request.setAttribute("key", "organization.edit.title");
         }
-        form.setOrganization(organization);
-
         List<String> selectedOrgTypes = form.getSelectedTypes();
 
         organization.setSysUserId(getSysUserId(request));
 
         List states = getPossibleStates(form);
+
         PropertyUtils.copyProperties(organization, form);
 
         if (FormFields.getInstance().useField(FormFields.Field.OrganizationParent)) {
@@ -340,12 +337,12 @@ public class OrganizationController extends BaseController {
 
         } catch (LIMSRuntimeException e) {
             // bugzilla 2154
-            LogEvent.logError(e.toString(), e);
-            if (e.getException() instanceof org.hibernate.StaleObjectStateException) {
+            LogEvent.logError(e);
+            if (e.getCause() instanceof org.hibernate.StaleObjectStateException) {
                 result.reject("errors.OptimisticLockException");
             } else {
                 // bugzilla 1482
-                if (e.getException() instanceof LIMSDuplicateRecordException) {
+                if (e.getCause() instanceof LIMSDuplicateRecordException) {
                     String messageKey = "organization.organization";
                     String msg = MessageUtil.getMessage(messageKey);
                     result.reject("errors.DuplicateRecord.activeonly", new String[] { msg },
@@ -358,11 +355,10 @@ public class OrganizationController extends BaseController {
             request.setAttribute(PREVIOUS_DISABLED, "true");
             request.setAttribute(NEXT_DISABLED, "true");
             return findForward(FWD_FAIL_INSERT, form);
-
         }
-        //		finally {
-        //			HibernateUtil.closeSession();
-        //		}
+        // finally {
+        // HibernateUtil.closeSession();
+        // }
         PropertyUtils.copyProperties(form, organization);
 
         if (states != null) {
@@ -429,7 +425,7 @@ public class OrganizationController extends BaseController {
                     departmentAddress = new OrganizationAddress();
                     departmentAddress.setAddressPartId(DEPARTMENT_ID);
                     departmentAddress.setType("D");
-                    departmentAddress.setOrganizationId(form.getOrganization().getId());
+                    departmentAddress.setOrganizationId(form.getId());
                 }
 
                 departmentAddress.setValue(form.getDepartment());
@@ -442,7 +438,7 @@ public class OrganizationController extends BaseController {
                     communeAddress = new OrganizationAddress();
                     communeAddress.setAddressPartId(COMMUNE_ID);
                     communeAddress.setType("T");
-                    communeAddress.setOrganizationId(form.getOrganization().getId());
+                    communeAddress.setOrganizationId(form.getId());
                 }
 
                 communeAddress.setValue(form.getCommune());
@@ -454,7 +450,7 @@ public class OrganizationController extends BaseController {
                     villageAddress = new OrganizationAddress();
                     villageAddress.setAddressPartId(VILLAGE_ID);
                     villageAddress.setType("T");
-                    villageAddress.setOrganizationId(form.getOrganization().getId());
+                    villageAddress.setOrganizationId(form.getId());
                 }
 
                 villageAddress.setValue(form.getVillage());
@@ -495,13 +491,13 @@ public class OrganizationController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "organizationDefinition";
         } else if (FWD_FAIL.equals(forward)) {
-            return "redirect:/MasterListsPage.do";
+            return "redirect:/MasterListsPage";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/OrganizationMenu.do";
+            return "redirect:/OrganizationMenu";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "organizationDefinition";
         } else if (FWD_CANCEL.equals(forward)) {
-            return "redirect:/OrganizationMenu.do";
+            return "redirect:/OrganizationMenu";
         } else {
             return "PageNotFound";
         }

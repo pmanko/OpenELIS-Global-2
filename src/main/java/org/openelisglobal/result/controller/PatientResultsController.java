@@ -3,10 +3,9 @@ package org.openelisglobal.result.controller;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
-
 import org.apache.commons.validator.GenericValidator;
+import org.openelisglobal.common.constants.Constants;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.services.DisplayListService;
 import org.openelisglobal.common.services.DisplayListService.ListType;
@@ -23,6 +22,7 @@ import org.openelisglobal.result.action.util.ResultsLoadUtility;
 import org.openelisglobal.result.action.util.ResultsPaging;
 import org.openelisglobal.result.form.PatientResultsForm;
 import org.openelisglobal.spring.util.SpringContext;
+import org.openelisglobal.systemuser.service.UserService;
 import org.openelisglobal.test.beanItems.TestResultItem;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -39,6 +39,8 @@ public class PatientResultsController extends BaseController {
 
     @Autowired
     PatientService patientService;
+    @Autowired
+    private UserService userService;
 
     @InitBinder
     public void initBinder(WebDataBinder binder) {
@@ -48,6 +50,7 @@ public class PatientResultsController extends BaseController {
     @RequestMapping(value = "/PatientResults", method = RequestMethod.GET)
     public ModelAndView showPatientResults(HttpServletRequest request)
             throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+
         PatientResultsForm form = new PatientResultsForm();
         form.setReferralOrganizations(DisplayListService.getInstance().getList(ListType.REFERRAL_ORGANIZATIONS));
 
@@ -59,6 +62,7 @@ public class PatientResultsController extends BaseController {
         form.setReferralReasons(DisplayListService.getInstance().getList(DisplayListService.ListType.REFERRAL_REASONS));
         form.setRejectReasons(DisplayListService.getInstance()
                 .getNumberedListWithLeadingBlank(DisplayListService.ListType.REJECTION_REASONS));
+        form.setMethods(DisplayListService.getInstance().getList(ListType.METHODS));
         PatientSearch patientSearch = new PatientSearch();
         patientSearch.setLoadFromServerWithPatient(true);
         patientSearch.setSelectedPatientActionButtonText(MessageUtil.getMessage("resultsentry.patient.search"));
@@ -80,13 +84,17 @@ public class PatientResultsController extends BaseController {
                 if (statusRules.equals(STATUS_RULES_RETROCI)) {
                     resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.TechnicalRejected);
                     resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.Canceled);
+                    resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.SampleRejected);
                 } else if (statusRules.equals(STATUS_RULES_HAITI) || statusRules.equals(STATUS_RULES_HAITI_LNSP)) {
                     resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.Canceled);
+                    resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.SampleRejected);
                 }
 
                 List<TestResultItem> results = resultsUtility.getGroupedTestsForPatient(patient);
 
-                form.setTestResult(results);
+                List<TestResultItem> filteredResults = userService.filterResultsByLabUnitRoles(getSysUserId(request),
+                        results, Constants.ROLE_RESULTS);
+                form.setTestResult(filteredResults);
 
                 // move this out of results utility
                 resultsUtility.addIdentifingPatientInfo(patient, form);
@@ -98,7 +106,7 @@ public class PatientResultsController extends BaseController {
                     addEmptyInventoryList(form);
                 }
 
-                paging.setDatabaseResults(request, form, results);
+                paging.setDatabaseResults(request, form, filteredResults);
 
             } else {
                 form.setTestResult(new ArrayList<TestResultItem>());

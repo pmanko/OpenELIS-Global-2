@@ -4,12 +4,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
-
 import org.apache.commons.validator.GenericValidator;
 import org.hibernate.StaleObjectStateException;
 import org.openelisglobal.common.controller.BaseController;
@@ -90,8 +88,7 @@ public class SiteInformationController extends BaseController {
         binder.setAllowedFields(ALLOWED_FIELDS);
     }
 
-    @RequestMapping(value = { "/NonConformityConfiguration", "/WorkplanConfiguration",
-            "/PrintedReportsConfiguration",
+    @RequestMapping(value = { "/NonConformityConfiguration", "/WorkplanConfiguration", "/PrintedReportsConfiguration",
             "/SampleEntryConfig", "/ResultConfiguration", "/MenuStatementConfig", "/PatientConfiguration",
             "/ValidationConfiguration", "/SiteInformation", "/NextPreviousNonConformityConfiguration",
             "/NextPreviousWorkplanConfiguration", "/NextPreviousPrintedReportsConfiguration",
@@ -209,7 +206,7 @@ public class SiteInformationController extends BaseController {
             form.setFormAction("SiteInformation");
         }
 
-        form.setCancelAction("Cancel" + form.getFormAction() + ".do");
+        form.setCancelAction("Cancel" + form.getFormAction());
     }
 
     private String getInstruction(SiteInformation siteInformation) {
@@ -234,8 +231,7 @@ public class SiteInformationController extends BaseController {
         return Boolean.TRUE;
     }
 
-    @RequestMapping(value = { "/NonConformityConfiguration", "/WorkplanConfiguration",
-            "/PrintedReportsConfiguration",
+    @RequestMapping(value = { "/NonConformityConfiguration", "/WorkplanConfiguration", "/PrintedReportsConfiguration",
             "/SampleEntryConfig", "/ResultConfiguration", "/MenuStatementConfig", "/PatientConfiguration",
             "/ValidationConfiguration", "/SiteInformation" }, method = RequestMethod.POST)
     public ModelAndView showUpdateSiteInformation(HttpServletRequest request, HttpServletResponse response,
@@ -265,7 +261,7 @@ public class SiteInformationController extends BaseController {
             forward = validateAndUpdateSiteInformation(request, response, form, isNew);
         }
         // makes the changes take effect immediately
-        ConfigurationProperties.forceReload();
+        ConfigurationProperties.loadDBValuesIntoConfiguration();
         DisplayListService.getInstance().refreshLists();
         if (FWD_SUCCESS_INSERT.equals(forward)) {
             redirectAttributes.addFlashAttribute(FWD_SUCCESS, true);
@@ -333,12 +329,12 @@ public class SiteInformationController extends BaseController {
         }
         try {
             siteInformationService.persistData(siteInformation, newSiteInformation);
-            if (siteInformation.getName().equals(Property.DEFAULT_LANG_LOCALE.getName())) {
+            if (siteInformation.getName().equals(Property.DEFAULT_LANG_LOCALE.getDBName())) {
                 localeResolver.setLocale(request, response, Locale.forLanguageTag(siteInformation.getValue()));
             }
         } catch (LIMSRuntimeException e) {
             String errorMsg;
-            if (e.getException() instanceof StaleObjectStateException) {
+            if (e.getCause() instanceof StaleObjectStateException) {
 
                 errorMsg = "errors.OptimisticLockException";
 
@@ -353,7 +349,6 @@ public class SiteInformationController extends BaseController {
             request.setAttribute(PREVIOUS_DISABLED, TRUE);
             request.setAttribute(NEXT_DISABLED, TRUE);
             forward = FWD_FAIL_INSERT;
-
         }
         return forward;
     }
@@ -447,8 +442,7 @@ public class SiteInformationController extends BaseController {
      * }
      */
 
-    @RequestMapping(value = { "/CancelNonConformityConfiguration",
-            "/CancelWorkplanConfiguration",
+    @RequestMapping(value = { "/CancelNonConformityConfiguration", "/CancelWorkplanConfiguration",
             "/CancelPrintedReportsConfiguration", "/CancelSampleEntryConfig", "/CancelResultConfiguration",
             "/CancelMenuStatementConfig", "/CancelPatientConfiguration", "/CancelValidationConfiguration",
             "/CancelSiteInformation" }, method = RequestMethod.GET)
@@ -463,16 +457,16 @@ public class SiteInformationController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "siteInformationDefinition";
         } else if (FWD_FAIL.equals(forward)) {
-            return "redirect:/MasterListsPage.do";
+            return "redirect:/MasterListsPage";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            String url = pathNoSuffix + "Menu.do";
+            String url = pathNoSuffix + "Menu";
             return "redirect:" + url;
         } else if (FWD_FAIL_INSERT.equals(forward)) {
-            String url = pathNoSuffix + ".do";
+            String url = pathNoSuffix;
             return "redirect:" + url;
         } else if (FWD_CANCEL.equals(forward)) {
             String prefix = "Cancel";
-            String url = pathNoSuffix.substring(pathNoSuffix.indexOf(prefix) + prefix.length()) + "Menu.do";
+            String url = pathNoSuffix.substring(pathNoSuffix.indexOf(prefix) + prefix.length()) + "Menu";
             return "redirect:" + url;
         } else {
             return "PageNotFound";
@@ -488,5 +482,4 @@ public class SiteInformationController extends BaseController {
     protected String getPageSubtitleKey() {
         return (String) request.getAttribute("key");
     }
-
 }

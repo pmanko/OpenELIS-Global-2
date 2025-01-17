@@ -9,7 +9,6 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
-
 import org.openelisglobal.common.valueholder.BaseObject;
 
 @Entity
@@ -36,7 +35,6 @@ public class NotificationPayloadTemplate extends BaseObject<Integer> {
 
     @Column(name = "subject_template")
     private String subjectTemplate;
-
 
     public String getMessageTemplate() {
         return messageTemplate;

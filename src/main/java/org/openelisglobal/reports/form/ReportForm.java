@@ -1,9 +1,7 @@
 package org.openelisglobal.reports.form;
 
 import java.util.List;
-
 import javax.validation.constraints.Pattern;
-
 import org.openelisglobal.common.form.BaseForm;
 import org.openelisglobal.common.util.IdValuePair;
 import org.openelisglobal.common.validator.ValidationHelper;
@@ -11,11 +9,31 @@ import org.openelisglobal.organization.valueholder.Organization;
 import org.openelisglobal.patient.action.bean.PatientSearch;
 import org.openelisglobal.project.valueholder.Project;
 import org.openelisglobal.reports.action.implementation.ReportSpecificationList;
+import org.openelisglobal.sample.valueholder.OrderPriority;
 import org.openelisglobal.validation.annotations.ValidDate;
 
-//values not preserved, so security validation not a large concern
-//values used in jasperreports
+// values not preserved, so security validation not a large concern
+// values used in jasperreports
 public class ReportForm extends BaseForm {
+
+    public enum DateType {
+        RESULT_DATE("report.label.datetype.resultdate"), ORDER_DATE("report.label.datetype.orderdate"),
+        PRINT_DATE("report.label.datetype.printdate");
+
+        String messageKey;
+
+        DateType(String messageKey) {
+            this.messageKey = messageKey;
+        }
+
+        public String getMessageKey() {
+            return this.messageKey;
+        }
+    }
+
+    public enum ReceptionTime {
+        NORMAL_WORK_HOURS, OUT_OF_NORMAL_WORK_HOURS;
+    }
 
     private boolean noRequestSpecifications = false;
 
@@ -66,8 +84,12 @@ public class ReportForm extends BaseForm {
 
     private boolean useDashboard = false;
 
+    private boolean useExportDateType = false;
+
     @Pattern(regexp = ValidationHelper.ID_REGEX)
     private String projectCode = "";
+
+    private String vlStudyType = "";
 
     private List<@Pattern(regexp = ValidationHelper.ID_REGEX) String> analysisIds;
 
@@ -107,6 +129,82 @@ public class ReportForm extends BaseForm {
     private PatientSearch patientSearch;
 
     private String selPatient;
+
+    private boolean useSiteSearch;
+
+    private boolean useArvOrganizationSearch;
+
+    private String referringSiteId;
+
+    private List<IdValuePair> referringSiteList;
+
+    private List<Organization> arvOrganizationList;
+
+    private String arvSiteId;
+
+    private List<IdValuePair> arvSiteList;
+
+    private String referringSiteDepartmentId;
+
+    private List<IdValuePair> referringSiteDepartmentList;
+
+    private boolean onlyResults;
+
+    private DateType dateType;
+
+    private List<OrderPriority> priority;
+
+    private List<ReceptionTime> receptionTime;
+
+    private List<String> labSections;
+
+    private Boolean useStatisticsParams = false;
+
+    private String programSampleId;
+
+    private String erPercent;
+
+    private String erIntensity;
+
+    private String erScore;
+
+    private String prPercent;
+
+    private String prIntensity;
+
+    private String prScore;
+
+    private String mib;
+
+    private String pattern;
+
+    private String herAssesment;
+
+    private String herScore;
+
+    private String diagnosis;
+
+    private String molecularSubType;
+
+    private String conclusion;
+
+    private String ihcScore;
+
+    private String ihcRatio;
+
+    private String averageChrom;
+
+    private String averageHer2;
+
+    private String numberOfcancerNuclei;
+
+    private List<String> codedConclusions;
+
+    // for display
+    private List<IdValuePair> priorityList;
+
+    // for display
+    private List<IdValuePair> receptionTimeList;
 
     public ReportForm() {
         setFormName("ReportForm");
@@ -156,6 +254,14 @@ public class ReportForm extends BaseForm {
         return accessionDirect;
     }
 
+    public String getAccessionDirectNoSuffix() {
+        if (accessionDirect == null || !accessionDirect.contains(".")) {
+            return accessionDirect;
+        } else {
+            return accessionDirect.substring(0, accessionDirect.indexOf('.'));
+        }
+    }
+
     public void setAccessionDirect(String accessionDirect) {
         this.accessionDirect = accessionDirect;
     }
@@ -178,6 +284,14 @@ public class ReportForm extends BaseForm {
 
     public String getHighAccessionDirect() {
         return highAccessionDirect;
+    }
+
+    public String getHighAccessionDirectNoSuffix() {
+        if (highAccessionDirect == null || !highAccessionDirect.contains(".")) {
+            return highAccessionDirect;
+        } else {
+            return highAccessionDirect.substring(0, highAccessionDirect.indexOf('.'));
+        }
     }
 
     public void setHighAccessionDirect(String highAccessionDirect) {
@@ -295,12 +409,28 @@ public class ReportForm extends BaseForm {
         this.useDashboard = useDashboard;
     }
 
+    public boolean getUseExportDateType() {
+        return useExportDateType;
+    }
+
+    public void setUseExportDateType(boolean useExportDateType) {
+        this.useExportDateType = useExportDateType;
+    }
+
     public String getProjectCode() {
         return projectCode;
     }
 
     public void setProjectCode(String projectCode) {
         this.projectCode = projectCode;
+    }
+
+    public String getVlStudyType() {
+        return vlStudyType;
+    }
+
+    public void setVlStudyType(String vlStudyType) {
+        this.vlStudyType = vlStudyType;
     }
 
     public boolean getUsePredefinedDateRanges() {
@@ -430,4 +560,301 @@ public class ReportForm extends BaseForm {
     public void setAnalysisIds(List<@Pattern(regexp = ValidationHelper.ID_REGEX) String> analysisIds) {
         this.analysisIds = analysisIds;
     }
+
+    public boolean isUseSiteSearch() {
+        return useSiteSearch;
+    }
+
+    public void setUseSiteSearch(boolean useSiteSearch) {
+        this.useSiteSearch = useSiteSearch;
+    }
+
+    public List<IdValuePair> getReferringSiteList() {
+        return referringSiteList;
+    }
+
+    public void setReferringSiteList(List<IdValuePair> referringSiteList) {
+        this.referringSiteList = referringSiteList;
+    }
+
+    public String getReferringSiteId() {
+        return referringSiteId;
+    }
+
+    public void setReferringSiteId(String referringSiteId) {
+        this.referringSiteId = referringSiteId;
+    }
+
+    public String getReferringSiteDepartmentId() {
+        return referringSiteDepartmentId;
+    }
+
+    public void setReferringSiteDepartmentId(String referringSiteDepartmentId) {
+        this.referringSiteDepartmentId = referringSiteDepartmentId;
+    }
+
+    public List<IdValuePair> getReferringSiteDepartmentList() {
+        return referringSiteDepartmentList;
+    }
+
+    public void setReferringSiteDepartmentList(List<IdValuePair> referringSiteDepartmentList) {
+        this.referringSiteDepartmentList = referringSiteDepartmentList;
+    }
+
+    public boolean isOnlyResults() {
+        return onlyResults;
+    }
+
+    public void setOnlyResults(boolean onlyResults) {
+        this.onlyResults = onlyResults;
+    }
+
+    public DateType getDateType() {
+        return dateType;
+    }
+
+    public void setDateType(DateType dateType) {
+        this.dateType = dateType;
+    }
+
+    public List<OrderPriority> getPriority() {
+        return priority;
+    }
+
+    public void setPriority(List<OrderPriority> priority) {
+        this.priority = priority;
+    }
+
+    public List<String> getLabSections() {
+        return labSections;
+    }
+
+    public void setLabSections(List<String> labSections) {
+        this.labSections = labSections;
+    }
+
+    public List<IdValuePair> getPriorityList() {
+        return priorityList;
+    }
+
+    public void setPriorityList(List<IdValuePair> priorityList) {
+        this.priorityList = priorityList;
+    }
+
+    public List<IdValuePair> getReceptionTimeList() {
+        return receptionTimeList;
+    }
+
+    public void setReceptionTimeList(List<IdValuePair> receptionTimeList) {
+        this.receptionTimeList = receptionTimeList;
+    }
+
+    public Boolean getUseStatisticsParams() {
+        return useStatisticsParams;
+    }
+
+    public void setUseStatisticsParams(Boolean useStatisticsParams) {
+        this.useStatisticsParams = useStatisticsParams;
+    }
+
+    public List<ReceptionTime> getReceptionTime() {
+        return receptionTime;
+    }
+
+    public void setReceptionTime(List<ReceptionTime> receptionTime) {
+        this.receptionTime = receptionTime;
+    }
+
+    public String getProgramSampleId() {
+        return programSampleId;
+    }
+
+    public void setProgramSampleId(String programSampleId) {
+        this.programSampleId = programSampleId;
+    }
+
+    public String getErPercent() {
+        return erPercent;
+    }
+
+    public void setErPercent(String erPercent) {
+        this.erPercent = erPercent;
+    }
+
+    public String getErIntensity() {
+        return erIntensity;
+    }
+
+    public void setErIntensity(String erIntensity) {
+        this.erIntensity = erIntensity;
+    }
+
+    public String getErScore() {
+        return erScore;
+    }
+
+    public void setErScore(String erScore) {
+        this.erScore = erScore;
+    }
+
+    public String getPrPercent() {
+        return prPercent;
+    }
+
+    public void setPrPercent(String prPercent) {
+        this.prPercent = prPercent;
+    }
+
+    public String getPrIntensity() {
+        return prIntensity;
+    }
+
+    public void setPrIntensity(String prIntensity) {
+        this.prIntensity = prIntensity;
+    }
+
+    public String getPrScore() {
+        return prScore;
+    }
+
+    public void setPrScore(String prScore) {
+        this.prScore = prScore;
+    }
+
+    public String getMib() {
+        return mib;
+    }
+
+    public void setMib(String mib) {
+        this.mib = mib;
+    }
+
+    public String getPattern() {
+        return pattern;
+    }
+
+    public void setPattern(String pattern) {
+        this.pattern = pattern;
+    }
+
+    public String getHerScore() {
+        return herScore;
+    }
+
+    public void setHerScore(String herScore) {
+        this.herScore = herScore;
+    }
+
+    public String getDiagnosis() {
+        return diagnosis;
+    }
+
+    public void setDiagnosis(String diagnosis) {
+        this.diagnosis = diagnosis;
+    }
+
+    public String getMolecularSubType() {
+        return molecularSubType;
+    }
+
+    public void setMolecularSubType(String molecularSubType) {
+        this.molecularSubType = molecularSubType;
+    }
+
+    public String getHerAssesment() {
+        return herAssesment;
+    }
+
+    public void setHerAssesment(String herAssesment) {
+        this.herAssesment = herAssesment;
+    }
+
+    public String getConclusion() {
+        return conclusion;
+    }
+
+    public void setConclusion(String conclusion) {
+        this.conclusion = conclusion;
+    }
+
+    public String getIhcScore() {
+        return ihcScore;
+    }
+
+    public void setIhcScore(String ihcScore) {
+        this.ihcScore = ihcScore;
+    }
+
+    public String getIhcRatio() {
+        return ihcRatio;
+    }
+
+    public void setIhcRatio(String ihcRatio) {
+        this.ihcRatio = ihcRatio;
+    }
+
+    public String getAverageChrom() {
+        return averageChrom;
+    }
+
+    public void setAverageChrom(String averageChrom) {
+        this.averageChrom = averageChrom;
+    }
+
+    public String getAverageHer2() {
+        return averageHer2;
+    }
+
+    public void setAverageHer2(String averageHer2) {
+        this.averageHer2 = averageHer2;
+    }
+
+    public String getNumberOfcancerNuclei() {
+        return numberOfcancerNuclei;
+    }
+
+    public void setNumberOfcancerNuclei(String numberOfcancerNuclei) {
+        this.numberOfcancerNuclei = numberOfcancerNuclei;
+    }
+
+    public String getArvSiteId() {
+        return arvSiteId;
+    }
+
+    public void setArvSiteId(String arvSiteId) {
+        this.arvSiteId = arvSiteId;
+    }
+
+    public List<IdValuePair> getArvSiteList() {
+        return arvSiteList;
+    }
+
+    public void setArvSiteList(List<IdValuePair> arvSiteList) {
+        this.arvSiteList = arvSiteList;
+    }
+
+    public boolean isUseArvOrganizationSearch() {
+        return useArvOrganizationSearch;
+    }
+
+    public void setUseArvOrganizationSearch(boolean useArvOrganizationSearch) {
+        this.useArvOrganizationSearch = useArvOrganizationSearch;
+    }
+
+    public List<Organization> getArvOrganizationList() {
+        return arvOrganizationList;
+    }
+
+    public void setArvOrganizationList(List<Organization> arvOrganizationList) {
+        this.arvOrganizationList = arvOrganizationList;
+    }
+
+    public List<String> getCodedConclusions() {
+        return codedConclusions;
+    }
+
+    public void setCodedConclusions(List<String> codedConclusions) {
+        this.codedConclusions = codedConclusions;
+    }
+
 }

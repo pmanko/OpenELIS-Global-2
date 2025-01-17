@@ -2,10 +2,8 @@ package org.openelisglobal.testconfiguration.controller;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.hibernate.HibernateException;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -126,7 +124,7 @@ public class SampleTypeOrderController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "sampleTypeOrderDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/SampleTypeOrder.do";
+            return "redirect:/SampleTypeOrder";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "sampleTypeOrderDefinition";
         } else {

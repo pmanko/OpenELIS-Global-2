@@ -19,8 +19,8 @@ package org.openelisglobal.sample.action.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import org.apache.commons.validator.GenericValidator;
+import org.hl7.fhir.r4.model.QuestionnaireResponse;
 import org.openelisglobal.address.valueholder.OrganizationAddress;
 import org.openelisglobal.common.formfields.FormFields;
 import org.openelisglobal.common.formfields.FormFields.Field;
@@ -35,7 +35,6 @@ import org.openelisglobal.common.util.ConfigurationProperties;
 import org.openelisglobal.common.util.ConfigurationProperties.Property;
 import org.openelisglobal.common.util.DateUtil;
 import org.openelisglobal.common.util.StringUtil;
-import org.openelisglobal.common.util.SystemConfiguration;
 import org.openelisglobal.dataexchange.order.valueholder.ElectronicOrder;
 import org.openelisglobal.dataexchange.service.order.ElectronicOrderService;
 import org.openelisglobal.observationhistory.service.ObservationHistoryService;
@@ -45,19 +44,27 @@ import org.openelisglobal.observationhistory.valueholder.ObservationHistory.Valu
 import org.openelisglobal.organization.service.OrganizationService;
 import org.openelisglobal.organization.valueholder.Organization;
 import org.openelisglobal.patient.util.PatientUtil;
+import org.openelisglobal.person.service.PersonService;
 import org.openelisglobal.person.valueholder.Person;
+import org.openelisglobal.program.service.ProgramService;
+import org.openelisglobal.program.valueholder.Program;
+import org.openelisglobal.program.valueholder.ProgramSample;
+import org.openelisglobal.program.valueholder.cytology.CytologySample;
+import org.openelisglobal.program.valueholder.immunohistochemistry.ImmunohistochemistrySample;
+import org.openelisglobal.program.valueholder.pathology.PathologySample;
+import org.openelisglobal.provider.service.ProviderService;
 import org.openelisglobal.provider.valueholder.Provider;
 import org.openelisglobal.requester.valueholder.SampleRequester;
 import org.openelisglobal.sample.bean.SampleOrderItem;
 import org.openelisglobal.sample.util.AccessionNumberUtil;
+import org.openelisglobal.sample.valueholder.OrderPriority;
 import org.openelisglobal.sample.valueholder.Sample;
 import org.openelisglobal.sample.valueholder.SampleAdditionalField;
 import org.openelisglobal.samplehuman.valueholder.SampleHuman;
 import org.openelisglobal.spring.util.SpringContext;
 import org.springframework.validation.Errors;
 
-/**
- */
+/** */
 public class SamplePatientUpdateData {
     private boolean savePatient = false;
     private Person providerPerson;
@@ -65,6 +72,7 @@ public class SamplePatientUpdateData {
     private String patientId;
     private String accessionNumber;
     private String referringId;
+    private OrderPriority priority;
 
     private Sample sample;
     private List<SampleAdditionalField> sampleFields = new ArrayList<>();
@@ -83,10 +91,14 @@ public class SamplePatientUpdateData {
 
     private OrganizationService orgService = SpringContext.getBean(OrganizationService.class);
     private ElectronicOrderService electronicOrderService = SpringContext.getBean(ElectronicOrderService.class);
+    private ProgramService programService = SpringContext.getBean(ProgramService.class);
 
     private List<ObservationHistory> observations = new ArrayList<>();
     private List<OrganizationAddress> orgAddressExtra = new ArrayList<>();
     private final String currentUserId;
+
+    private ProgramSample programSample;
+    private QuestionnaireResponse programQuestionnaireResponse;
 
     private boolean customNotificationLogic;
     private List<String> patientEmailNotificationTestIds;
@@ -309,7 +321,7 @@ public class SamplePatientUpdateData {
             sample.setCollectionDateForDisplay(collectionDateFromReceiveDate);
         }
 
-        sample.setDomain(SystemConfiguration.getInstance().getHumanDomain());
+        sample.setDomain(ConfigurationProperties.getInstance().getPropertyValue("domain.human"));
         sample.setStatusId(SpringContext.getBean(IStatusService.class).getStatusID(OrderStatus.Entered));
 
         setElectronicOrderIfNeeded(sampleOrder);
@@ -337,11 +349,16 @@ public class SamplePatientUpdateData {
         providerPerson = null;
         if (noRequesterInformation(sampleOrder)) {
             provider = PatientUtil.getUnownProvider();
+        } else if (!GenericValidator.isBlankOrNull(sampleOrder.getProviderPersonId())) {
+            provider = SpringContext.getBean(ProviderService.class).getProviderByPerson(
+                    SpringContext.getBean(PersonService.class).get(sampleOrder.getProviderPersonId()));
+            providerPerson = provider.getPerson();
+            providerPerson.setSysUserId(currentUserId);
         } else {
             providerPerson = new Person();
             provider = new Provider();
             provider.setFhirUuid(UUID.randomUUID());
-
+            provider.setActive(true);
             providerPerson.setFirstName(sampleOrder.getProviderFirstName());
             providerPerson.setLastName(sampleOrder.getProviderLastName());
             providerPerson.setWorkPhone(sampleOrder.getProviderWorkPhone());
@@ -355,7 +372,8 @@ public class SamplePatientUpdateData {
     }
 
     private boolean noRequesterInformation(SampleOrderItem sampleOrder) {
-        return (GenericValidator.isBlankOrNull(sampleOrder.getProviderFirstName())
+        return (GenericValidator.isBlankOrNull(sampleOrder.getProviderPersonId())
+                && GenericValidator.isBlankOrNull(sampleOrder.getProviderFirstName())
                 && GenericValidator.isBlankOrNull(sampleOrder.getProviderWorkPhone())
                 && GenericValidator.isBlankOrNull(sampleOrder.getProviderLastName())
                 && GenericValidator.isBlankOrNull(sampleOrder.getRequesterSampleID())
@@ -410,8 +428,7 @@ public class SamplePatientUpdateData {
         String orgId = orderItem.getReferringSiteDepartmentId();
 
         if (!GenericValidator.isBlankOrNull(orgId)) {
-            requester = createSiteRequester(orgId,
-                    TableIdService.getInstance().ORGANIZATION_REQUESTER_TYPE_ID);
+            requester = createSiteRequester(orgId, TableIdService.getInstance().ORGANIZATION_REQUESTER_TYPE_ID);
         }
 
         return requester;
@@ -419,7 +436,9 @@ public class SamplePatientUpdateData {
 
     private SampleRequester initSampleRequester(SampleOrderItem orderItem) {
         SampleRequester requester = null;
-
+        if (!GenericValidator.isBlankOrNull(orderItem.getReferringSiteName())) {
+            orderItem.setNewRequesterName(orderItem.getReferringSiteName());
+        }
         String orgId = orderItem.getReferringSiteId();
 
         if (!GenericValidator.isBlankOrNull(orgId)) {
@@ -502,6 +521,22 @@ public class SamplePatientUpdateData {
         setSampleAddService(sampleAddService);
     }
 
+    public void initProgramQuestions(String programId, QuestionnaireResponse additionalQuestions) {
+        Program program = programService.get(programId);
+        setProgramQuestionnaireResponse(additionalQuestions);
+        if (program.getProgramName().toLowerCase().contains("pathology")) {
+            setProgramSample(new PathologySample());
+        } else if (program.getProgramName().toLowerCase().contains("immunohistochemistry")) {
+            setProgramSample(new ImmunohistochemistrySample());
+        } else if (program.getProgramName().toLowerCase().contains("cytology")) {
+            setProgramSample(new CytologySample());
+        } else {
+            setProgramSample(new ProgramSample());
+        }
+        getProgramSample().setProgram(program);
+        getProgramSample().setSysUserId(currentUserId);
+    }
+
     private void addObservations(SampleOrderItem sampleOrder, boolean trackPayments) {
         ObservationHistoryService observationHistoryService = SpringContext.getBean(ObservationHistoryService.class);
         if (trackPayments) {
@@ -529,10 +564,18 @@ public class SamplePatientUpdateData {
                     observationHistoryService.getObservationTypeIdForType(ObservationType.BILLING_REFERENCE_NUMBER),
                     ValueType.LITERAL);
         }
+
         if (ConfigurationProperties.getInstance().isPropertyValueEqual(Property.ORDER_PROGRAM, "true")) {
             createObservation(sampleOrder.getProgram(),
                     observationHistoryService.getObservationTypeIdForType(ObservationType.PROGRAM),
                     ValueType.DICTIONARY);
+        }
+        if (ConfigurationProperties.getInstance().isPropertyValueEqual(Property.ORDER_PROGRAM, "true")) {
+            if (!GenericValidator.isBlankOrNull(sampleOrder.getProgramId())) {
+                createObservation(programService.get(sampleOrder.getProgramId()).getProgramName(),
+                        observationHistoryService.getObservationTypeIdForType(ObservationType.PROGRAM),
+                        ValueType.LITERAL);
+            }
         }
     }
 
@@ -598,4 +641,27 @@ public class SamplePatientUpdateData {
         this.sampleFields.addAll(sampleFields);
     }
 
+    public OrderPriority getPriority() {
+        return priority;
+    }
+
+    public void setPriority(OrderPriority priority) {
+        this.priority = priority;
+    }
+
+    public ProgramSample getProgramSample() {
+        return programSample;
+    }
+
+    public void setProgramSample(ProgramSample programSample) {
+        this.programSample = programSample;
+    }
+
+    public QuestionnaireResponse getProgramQuestionnaireResponse() {
+        return programQuestionnaireResponse;
+    }
+
+    public void setProgramQuestionnaireResponse(QuestionnaireResponse programQuestionnaireResponse) {
+        this.programQuestionnaireResponse = programQuestionnaireResponse;
+    }
 }

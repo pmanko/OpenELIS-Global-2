@@ -2,7 +2,6 @@ package org.openelisglobal.testconfiguration.controller;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
 import org.openelisglobal.common.log.LogEvent;
@@ -50,7 +49,7 @@ public class PanelRenameEntryController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "panelRenameDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/PanelRenameEntry.do";
+            return "redirect:/PanelRenameEntry";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "panelRenameDefinition";
         } else {

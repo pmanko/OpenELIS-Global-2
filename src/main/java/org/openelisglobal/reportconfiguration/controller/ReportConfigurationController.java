@@ -3,9 +3,7 @@ package org.openelisglobal.reportconfiguration.controller;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
-
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.internationalization.MessageUtil;
 import org.openelisglobal.reportconfiguration.form.ReportConfigurationForm;
@@ -117,7 +115,7 @@ public class ReportConfigurationController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "ReportManagementDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/ReportConfiguration.do";
+            return "redirect:/ReportConfiguration";
         } else if (FWD_FAIL.equals(forward)) {
             return "ReportManagementDefinition";
         } else {

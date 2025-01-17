@@ -4,17 +4,15 @@
                  org.openelisglobal.common.formfields.FormFields.Field,
                  org.openelisglobal.patient.action.bean.PatientManagementInfo,
                  org.openelisglobal.common.services.PhoneNumberService,
+				 org.openelisglobal.common.services.AddressService,
                  org.openelisglobal.common.util.*, org.openelisglobal.internationalization.MessageUtil" %>
-
+				 <%@page import="org.openelisglobal.common.util.DateUtil"%>
 <%@ page isELIgnored="false" %>
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags"%>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 
 <%@ taglib prefix="ajax" uri="/tags/ajaxtags" %>
-
-<%@ taglib uri="http://tiles.apache.org/tags-tiles" prefix="tiles"%>
-
 
 <script type="text/javascript" src="scripts/ajaxCalls.js?"></script>
 <script type="text/javascript" src="scripts/utilities.js?" ></script>
@@ -28,6 +26,8 @@
 	String formName = (String) request.getAttribute("formName");
 	PatientManagementInfo patientProperties = (PatientManagementInfo) request.getAttribute("patientProperties");
 
+	boolean supportPatientPhone = FormFields.getInstance().useField(Field.PatientPhone);
+	boolean supportPatientEmail = FormFields.getInstance().useField(Field.PatientEmail);
 	boolean supportSTNumber = FormFields.getInstance().useField(Field.StNumber);
 	boolean supportAKA = FormFields.getInstance().useField(Field.AKA);
 	boolean supportMothersName = FormFields.getInstance().useField(Field.MothersName);
@@ -71,6 +71,8 @@ var $jq = jQuery.noConflict();
   tiles with simular names.  Only those elements that may cause confusion are being tagged, and we know which ones will collide
   because we can predicte the future */
 
+var supportPatientPhone = <%= supportPatientPhone %>;
+var supportPatientEmail = <%= supportPatientEmail %>;
 var supportSTNumber = <%= supportSTNumber %>;
 var supportAKA = <%= supportAKA %>;
 var supportMothersName = <%= supportMothersName %>;
@@ -242,8 +244,8 @@ function  /*string*/ pt_requiredFieldsValidMessage()
 	var returnMessage = "";
 	var oneOfMembers = "";
 	var requiredField = "";
-    var i;
-
+	var i;
+	
 	for( i = 0; i < pt_requiredFields.length; ++i ){
 		if( $(pt_requiredFields[i]).value.blank() ){
 			hasError = true;
@@ -379,7 +381,7 @@ function  /*void*/ updatePatientAge( DOB )
 {
 	var date = String( DOB.value );
 
-	var datePattern = '<%=SystemConfiguration.getInstance().getPatternForDateLocale() %>';
+	var datePattern = '<%=DateUtil.getDateFormat() %>';
 	var splitPattern = datePattern.split("/");
 	var dayIndex = 0;
 	var monthIndex = 1;
@@ -395,11 +397,15 @@ function  /*void*/ updatePatientAge( DOB )
 		}
 	}
 
-
 	var splitDOB = date.split("/");
 	var monthDOB = splitDOB[monthIndex];
 	var dayDOB = splitDOB[dayIndex];
 	var yearDOB = splitDOB[yearIndex];
+
+	if(monthDOB == "xx" || monthDOB == "XX" || dayDOB == "xx" || dayDOB == "XX" ){
+		monthDOB = "01";
+		dayDOB = "01";
+	}
 
 	var birthdate = new Date(yearDOB, monthDOB - 1, dayDOB);
 	var today = new Date();
@@ -519,7 +525,7 @@ function  /*void*/ pt_updateDOB( ageYears, ageMonths, ageDays )
 		}
 		year = date.getFullYear();
 
-		var datePattern = '<%=SystemConfiguration.getInstance().getPatternForDateLocale() %>';
+		var datePattern = '<%=DateUtil.getDateFormat() %>';
 		var splitPattern = datePattern.split("/");
 
 		var DOB = "";
@@ -541,7 +547,7 @@ function  /*void*/ pt_updateDOB( ageYears, ageMonths, ageDays )
 function  /*void*/ getDetailedPatientInfo()
 {
 	$("patientPK_ID").value = patientSelectID;
-
+	
 	new Ajax.Request (
                        'ajaxQueryXML',  //url
                         {//options
@@ -706,10 +712,8 @@ function  /*void*/ setPatientInfo(nationalID, ST_ID, subjectNumber, lastName, fi
 	$("patientLastUpdated").value = patientUpdated == undefined ? "" : patientUpdated;
 	$("personLastUpdated").value = personUpdated == undefined ? "" : personUpdated;
 	$("patientGUID_ID").value = guid == undefined ? "" : guid;
-	$("patientPhone").value = phoneNumber == undefined ? "" : phoneNumber;
-	<% if( FormFields.getInstance().useField(Field.PatientEmail)){ %> 
-	$("patientEmail").value = email == undefined ? "" : email;
-	<% } %>
+	if(supportPatientPhone) {$("patientPhone").value = phoneNumber == undefined ? "" : phoneNumber;}
+	if(supportPatientEmail) {$("patientEmail").value = email == undefined ? "" : email;}
 	$("genderID").selectedIndex = gender == undefined ? 0 : gender;
 	if(supportPatientNationality){
 		$("nationalityID").selectedIndex = nationalId == undefined ? 0 : nationalId; 
@@ -767,7 +771,7 @@ function  /*void*/ updatePatientEditStatus() {
 	if (updateStatus == "NO_ACTION") {
 		setUpdateStatus("UPDATE");
 	}
-
+	
 	for(var i = 0; i < patientInfoChangeListeners.length; i++){
 			patientInfoChangeListeners[i]($("firstNameID").value,
 										  $("lastNameID").value,
@@ -816,7 +820,7 @@ function  /*void*/ savePage()
 {
 	window.onbeforeunload = null; // Added to flag that formWarning alert isn't needed.
 	var form = document.getElementById("mainForm");
-	form.action = "PatientManagement.do";
+	form.action = "PatientManagement";
 	form.submit();
 }
 
@@ -833,8 +837,8 @@ function updateHealthDistrict( regionElement){
 }
 
 function healthDistrictSuccess( xhr ){
-  	//alert(xhr.responseText);
-
+	  //alert(xhr.responseText);
+	  
 	var message = xhr.responseXML.getElementsByTagName("message").item(0).firstChild.nodeValue;
 	var districts = xhr.responseXML.getElementsByTagName("formfield").item(0).childNodes[0].childNodes;
 	var selected = xhr.responseXML.getElementsByTagName("formfield").item(0).childNodes[1];
@@ -862,24 +866,24 @@ function validatePhoneNumber( phoneElement){
 }
 
 function  processPhoneSuccess(xhr){
-    //alert(xhr.responseText);
-
+	//alert(xhr.responseText);
+	
     var formField = xhr.responseXML.getElementsByTagName("formfield").item(0);
     var message = xhr.responseXML.getElementsByTagName("message").item(0);
-    var success = false;
-
+	var success = false;
+	
     if (message.firstChild.nodeValue == "valid"){
         success = true;
     }
-    var labElement = formField.firstChild.nodeValue;
-
+	var labElement = formField.firstChild.nodeValue;
+	
     setValidIndicaterOnField(success, labElement);
-    pt_setFieldValidity( success, labElement );
-
+	pt_setFieldValidity( success, labElement );
+	
     if( !success ){
         alert( message.firstChild.nodeValue );
-    }
-
+	}
+	
     pt_setSave();
 }
 
@@ -909,15 +913,15 @@ function  processSubjectNumberSuccess(xhr){
     var warning = messageParts[0] == "warning";
     var fail = messageParts[0] == "fail";
     var success = valid || warning;
-    var labElement = formField.firstChild.nodeValue;
-
+	var labElement = formField.firstChild.nodeValue;
+	
     setValidIndicaterOnField(success, labElement);
-    pt_setFieldValidity( success, labElement );
-
+	pt_setFieldValidity( success, labElement );
+	
     if( warning || fail ){
         alert( messageParts[1] );
-    }
-
+	}
+	
     pt_setSave();
 }
 </script>
@@ -926,14 +930,14 @@ function  processSubjectNumberSuccess(xhr){
 <%-- <nested:hidden name='${form.formName}' property="patientProperties.currentDate" id="currentDate"/> --%>
 <form:hidden path="patientProperties.currentDate" id="currentDate"/>
 
-<div id="PatientPage" style="display:inline"  >
+<div id="PatientPage" style="display:inline" >
 <%-- 	<nested:hidden property="patientProperties.patientLastUpdated" name='${form.formName}' id="patientLastUpdated" />
 	<nested:hidden property="patientProperties.personLastUpdated" name='${form.formName}'  id="personLastUpdated"/> --%>
 <form:hidden path="patientProperties.patientLastUpdated" id="patientLastUpdated"/>
 <form:hidden path="patientProperties.personLastUpdated" id="personLastUpdated"/>
 
-<%-- 	<tiles:insertAttribute name="patientSearch" /> --%>
-	<tiles:insertAttribute name="patientEnhancedSearch" />
+<%-- 	<jsp:include page="${patientSearchFragment}"/> --%>
+	<jsp:include page="${patientEnhancedSearchFragment}"/>
 
 <%-- 	<nested:hidden name='${form.formName}' property="patientProperties.patientProcessingStatus" id="processingStatus" value="add" />
 	<nested:hidden name='${form.formName}' property="patientProperties.patientPK" id="patientPK_ID" />
@@ -980,13 +984,13 @@ function  processSubjectNumberSuccess(xhr){
         </td>
     </tr>
     <tr>
-        <td >&nbsp;
-
+		<td >&nbsp;
+			
         </td>
         <%} %>
         <% if( supportSubjectNumber){ %>
-        <td>&nbsp;
-
+		<td>&nbsp;
+			
         </td>
         <td style="text-align:right;">
             <spring:message code="patient.subject.number"/>:
@@ -1005,8 +1009,8 @@ function  processSubjectNumberSuccess(xhr){
         </td>
     </tr>
     <tr>
-        <td >&nbsp;
-
+		<td >&nbsp;
+			
         </td>
         <% } %>
         <% if( supportNationalID ){ %>
@@ -1014,8 +1018,8 @@ function  processSubjectNumberSuccess(xhr){
             <%=MessageUtil.getContextualMessage("patient.NationalID") %>:
             <% if(nationalIDRequired){ %>
             <span class="requiredlabel">*</span>
-            <% } %>
-
+			<% } %>
+			
         </td>
         <td >
            <%--  <nested:text name='${form.formName}'
@@ -1026,11 +1030,11 @@ function  processSubjectNumberSuccess(xhr){
                          size="60"/> --%>
             <form:input path="patientProperties.nationalId" id="nationalID" onchange="validateSubjectNumber(this, 'nationalId');updatePatientEditStatus();" size="60"/>
         </td>
-        <td >&nbsp;
-
+		<td >&nbsp;
+			
         </td>
-        <td >&nbsp;
-
+		<td >&nbsp;
+			
         </td>
     </tr>
     <%} %>
@@ -1179,7 +1183,7 @@ function  processSubjectNumberSuccess(xhr){
 			<spring:message code="person.streetAddress" />
 		</td>
 		<td style="text-align:right;">
-			<spring:message code="person.streetAddress.street" />:
+			<%=" " + AddressService.getAddresslineLabel1() %>:
 		</td>
 		<td>
 			<%-- <nested:text name='${form.formName}'
@@ -1195,7 +1199,7 @@ function  processSubjectNumberSuccess(xhr){
     <tr>
         <td></td>
         <td style="text-align:right;">
-            <spring:message code="person.commune" />:
+			<%=" " + AddressService.getAddresslineLabel2() %>:
         </td>
         <td>
             <%-- <nested:text name='${form.formName}'
@@ -1212,7 +1216,7 @@ function  processSubjectNumberSuccess(xhr){
 	<tr>
 		<td></td>
 		<td style="text-align:right;">
-		    <%= MessageUtil.getContextualMessage("person.town") %>:
+			<%=" " + AddressService.getAddresslineLabel3() %>:
 		</td>
 		<td>
 			<%-- <nested:text name='${form.formName}'
@@ -1256,7 +1260,7 @@ function  processSubjectNumberSuccess(xhr){
 		</td>
 	</tr>
 	<% } %>
-	<% if( FormFields.getInstance().useField(Field.PatientPhone)){ %>
+	<% if( supportPatientPhone){ %>
 		<tr>
 			<td>&nbsp;</td>
 			<td style="text-align:right;"><%= MessageUtil.getContextualMessage("person.phone") %>: <%=" " + PhoneNumberService.getPhoneFormat() %></td>
@@ -1266,7 +1270,7 @@ function  processSubjectNumberSuccess(xhr){
  --%>			</td>
 		</tr>
 	<% } %>
-	<% if( FormFields.getInstance().useField(Field.PatientEmail)){ %> 
+	<% if( supportPatientEmail){ %> 
 		<tr>
 			<td>&nbsp;</td>
 			<td style="text-align:right;"><%= MessageUtil.getContextualMessage("person.email") %>:</td>
@@ -1279,7 +1283,7 @@ function  processSubjectNumberSuccess(xhr){
 	<tr>
 	<td>&nbsp;</td>
 	<td style="text-align:right;">
-		<%= FormFields.getInstance().getLabel(Field.PatientHealthRegion) %>:
+		<%=" " + AddressService.getGeographicUnitLabel1() %>:
 	</td>
 		<td>
 			<%-- <nested:hidden name='${form.formName}' property="patientProperties.healthRegion" id="shadowHealthRegion" />
@@ -1301,7 +1305,7 @@ function  processSubjectNumberSuccess(xhr){
 	<% if( FormFields.getInstance().useField(Field.PatientHealthDistrict)){ %>
 	<tr>
 	<td>&nbsp;</td>
-	<td style="text-align:right;"><spring:message code="person.health.district"/>: </td>
+	<td style="text-align:right;"><%=" " + AddressService.getGeographicUnitLabel2() %>:</td>
 		<td>
 			<%-- <html:select name='${form.formName}'
 						 property="patientProperties.healthDistrict"
@@ -1428,15 +1432,8 @@ function  processSubjectNumberSuccess(xhr){
 		<td>
 			<form:select path="patientProperties.patientType" onchange="updatePatientEditStatus();" id="patientTypeID">
 			<option value="0" ></option>
-			<form:options items="${patientProperties.patientTypes}" itemLabel="value" itemValue="id"/>
+			<form:options items="${patientProperties.patientTypes}" itemLabel="description" itemValue="type"/>
 				</form:select>
-			<%-- <nested:select name='${form.formName}'
-						 property="patientProperties.patientType"
-						 onchange="updatePatientEditStatus();"
-						 id="patientTypeID"  >
-				<option value="0" ></option>
-				<nested:optionsCollection name='${form.formName}' property="patientProperties.patientTypes" label="description" value="type" />
-			</nested:select> --%>
 		</td>
 		<% } if( supportInsurance ){ %>
 		<td style="text-align:right;">
@@ -1444,7 +1441,6 @@ function  processSubjectNumberSuccess(xhr){
 		</td>
 		<td>
 		<form:input path="patientProperties.insuranceNumber" onchange="updatePatientEditStatus();" id="insuranceID"/>
-		
 			<%-- <nested:text name='${form.formName}'
 					  property="patientProperties.insuranceNumber"
 					  onchange="updatePatientEditStatus();"
@@ -1510,17 +1506,10 @@ function  processSubjectNumberSuccess(xhr){
 	<% if( ConfigurationProperties.getInstance().isPropertyValueEqual(ConfigurationProperties.Property.PATIENT_NATIONALITY, "true") ){ %>
 		<tr>
 			<td style="text-align:right;"><spring:message code="patient.nationality"/>: </td>
-				<td>
+				<td>				
 					<form:select path="patientProperties.nationality" id="nationalityID">
-					<option value="0" ></option>
-					<form:options items="${patientProperties.nationalityList}" itemLabel="value" itemValue="value"/>
-					</form:select>
-					<%-- <html:select name='${form.formName}'
-								 property="patientProperties.nationality"
-							     id="nationalityID" >
-					<option value="0" ></option>
-					<html:optionsCollection name="${form.formName}" property="patientProperties.nationalityList" label="value" value="value" />
-					</html:select> --%>
+					<option value="0" ></option>	
+					</form:select>					
 				</td>
 				<td><spring:message code="specify"/>:</td>
 				<td>
@@ -1550,12 +1539,16 @@ function selectedPatientChangedForManagement(firstName, lastName, gender, DOB, s
 
 var registered = false;
 
-function registerPatientChangedForManagement(){
-	if( !registered ){
-		addPatientChangedListener( selectedPatientChangedForManagement );
+function registerPatientChangedForManagement() {
+	if (!registered) {
+		if (typeof addPatientChangedListener === 'function') {
+			addPatientChangedListener(selectedPatientChangedForManagement);
+		}
 		registered = true;
 	}
 }
 
 registerPatientChangedForManagement();
 </script> 
+<script type="text/javascript" src="scripts/countries.js?" ></script>
+

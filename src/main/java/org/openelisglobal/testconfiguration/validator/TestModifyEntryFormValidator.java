@@ -73,7 +73,7 @@ public class TestModifyEntryFormValidator implements Validator {
 
                     JSONArray tests = JSONUtils.getAsArray(sampleType.get("tests"));
                     for (int j = 0; j < tests.size(); ++j) {
-                        JSONObject test = JSONUtils.getAsObject(tests.get(i));
+                        JSONObject test = JSONUtils.getAsObject(tests.get(j));
                         ValidationHelper.validateIdField(StringUtil.nullSafeToString(test.get("id")), "JsonWad",
                                 "sampleTypes[" + i + "] tests[" + j + "] id", errors, false);
                     }
@@ -122,8 +122,22 @@ public class TestModifyEntryFormValidator implements Validator {
                                 "JsonWad", "result limit [" + i + "] highNormal", errors, false, 255,
                                 ValidationHelper.FLOAT_REGEX);
 
-                        ValidationHelper.validateField(StringUtil.nullSafeToString(resultLimit.get("reportingRange")),
-                                "JsonWad", "result limit [" + i + "] reportingRange", errors, false, 255,
+                        ValidationHelper.validateField(StringUtil.nullSafeToString(resultLimit.get("lowCritical")),
+                                "JsonWad", "result limit [" + i + "] lowCritical", errors, false, 255,
+                                ValidationHelper.FLOAT_REGEX);
+
+                        ValidationHelper.validateField(StringUtil.nullSafeToString(resultLimit.get("highCritical")),
+                                "JsonWad", "result limit [" + i + "] highCritical", errors, false, 255,
+                                ValidationHelper.FLOAT_REGEX);
+
+                        ValidationHelper.validateField(
+                                StringUtil.nullSafeToString(resultLimit.get("highCriticalRangeLow")), "JsonWad",
+                                "result limit [" + i + "] highCriticalRangeLow", errors, false, 255,
+                                ValidationHelper.FLOAT_REGEX);
+
+                        ValidationHelper.validateField(
+                                StringUtil.nullSafeToString(resultLimit.get("highCriticalRangeHigh")), "JsonWad",
+                                "result limit [" + i + "] highCriticalRangeHigh", errors, false, 255,
                                 ValidationHelper.FLOAT_REGEX);
 
                         if ((Boolean) resultLimit.get("gender")) {
@@ -136,22 +150,13 @@ public class TestModifyEntryFormValidator implements Validator {
                                     StringUtil.nullSafeToString(resultLimit.get("highNormalFemale")), "JsonWad",
                                     "result limit [" + i + "] highNormalFemale", errors, false, 255,
                                     ValidationHelper.FLOAT_REGEX);
-
-                            ValidationHelper.validateField(
-                                    StringUtil.nullSafeToString(resultLimit.get("reportingRangeFemale")), "JsonWad",
-                                    "result limit [" + i + "] reportingRangeFemale", errors, false, 255,
-                                    ValidationHelper.FLOAT_REGEX);
                         }
-
                     }
                 }
             }
-        } catch (
-
-        ParseException e) {
-            LogEvent.logError(e.toString(), e);
+        } catch (ParseException e) {
+            LogEvent.logError(e);
             errors.rejectValue("jsonWad", "error.field.format.json", "expected JSON but got something else");
         }
     }
-
 }

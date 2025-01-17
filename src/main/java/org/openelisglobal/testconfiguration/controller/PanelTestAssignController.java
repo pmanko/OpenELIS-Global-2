@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
@@ -161,7 +159,7 @@ public class PanelTestAssignController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "panelAssignDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            String url = "/PanelTestAssign.do?panelId=" + Encode.forUriComponent(request.getParameter("panelId"));
+            String url = "/PanelTestAssign?panelId=" + Encode.forUriComponent(request.getParameter("panelId"));
             return "redirect:" + url;
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "panelAssignDefinition";

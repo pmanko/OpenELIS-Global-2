@@ -1,10 +1,8 @@
 package org.openelisglobal.barcode.controller;
 
 import java.lang.reflect.InvocationTargetException;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.barcode.form.BarcodeConfigurationForm;
 import org.openelisglobal.barcode.service.BarcodeInformationService;
@@ -27,7 +25,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class BarcodeConfigurationController extends BaseController {
 
     private static final String[] ALLOWED_FIELDS = new String[] { "heightOrderLabels", "heightSpecimenLabels",
-            "widthOrderLabels", "widthSpecimenLabels", "collectionDateCheck", "testsCheck", "patientSexCheck",
+            "heightBlockLabels", "heightSlideLabels", "widthOrderLabels", "widthSpecimenLabels", "widthBlockLabels",
+            "widthSlideLabels", "collectionDateCheck", "collectedByCheck", "testsCheck", "patientSexCheck",
             "numMaxOrderLabels", "numMaxSpecimenLabels", "numDefaultOrderLabels", "numDefaultSpecimenLabels",
             "prePrintDontUseAltAccession", "prePrintAltAccessionPrefix" };
 
@@ -46,7 +45,7 @@ public class BarcodeConfigurationController extends BaseController {
         BarcodeConfigurationForm form = new BarcodeConfigurationForm();
 
         addFlashMsgsToRequest(request);
-        form.setCancelAction("MasterListsPage.do");
+        form.setCancelAction("MasterListsPage");
 
         setFields(form);
 
@@ -73,11 +72,21 @@ public class BarcodeConfigurationController extends BaseController {
                 .getPropertyValue(Property.SPECIMEN_BARCODE_HEIGHT);
         String widthSpecimenLabels = ConfigurationProperties.getInstance()
                 .getPropertyValue(Property.SPECIMEN_BARCODE_WIDTH);
+        String heightSlideLabels = ConfigurationProperties.getInstance()
+                .getPropertyValue(Property.SLIDE_BARCODE_HEIGHT);
+        String widthSlideLabels = ConfigurationProperties.getInstance().getPropertyValue(Property.SLIDE_BARCODE_WIDTH);
+        String heightBlockLabels = ConfigurationProperties.getInstance()
+                .getPropertyValue(Property.BLOCK_BARCODE_HEIGHT);
+        String widthBlockLabels = ConfigurationProperties.getInstance().getPropertyValue(Property.BLOCK_BARCODE_WIDTH);
         // set the dimension values
         form.setHeightOrderLabels(Float.parseFloat(heightOrderLabels));
         form.setWidthOrderLabels(Float.parseFloat(widthOrderLabels));
         form.setHeightSpecimenLabels(Float.parseFloat(heightSpecimenLabels));
         form.setWidthSpecimenLabels(Float.parseFloat(widthSpecimenLabels));
+        form.setHeightSlideLabels(Float.parseFloat(heightSlideLabels));
+        form.setWidthSlideLabels(Float.parseFloat(widthSlideLabels));
+        form.setHeightBlockLabels(Float.parseFloat(heightBlockLabels));
+        form.setWidthBlockLabels(Float.parseFloat(widthBlockLabels));
 
         // get the maximum print values
         String numMaxOrderLabels = ConfigurationProperties.getInstance().getPropertyValue(Property.MAX_ORDER_PRINTED);
@@ -105,10 +114,13 @@ public class BarcodeConfigurationController extends BaseController {
         // get the optional specimen values
         String collectionDateCheck = ConfigurationProperties.getInstance()
                 .getPropertyValue(Property.SPECIMEN_FIELD_DATE);
+        String collectedByCheck = ConfigurationProperties.getInstance()
+                .getPropertyValue(Property.SPECIMEN_FIELD_COLLECTED_BY);
         String testsCheck = ConfigurationProperties.getInstance().getPropertyValue(Property.SPECIMEN_FIELD_TESTS);
         String patientSexCheck = ConfigurationProperties.getInstance().getPropertyValue(Property.SPECIMEN_FIELD_SEX);
         // set the optional specimen values
         form.setCollectionDateCheck(Boolean.valueOf(collectionDateCheck));
+        form.setCollectedByCheck(Boolean.valueOf(collectedByCheck));
         form.setTestsCheck(Boolean.valueOf(testsCheck));
         form.setPatientSexCheck(Boolean.valueOf(patientSexCheck));
 
@@ -131,7 +143,7 @@ public class BarcodeConfigurationController extends BaseController {
         }
         if (result.hasErrors()) {
             saveErrors(result);
-            form.setCancelAction("MasterListsPage.do");
+            form.setCancelAction("MasterListsPage");
             return findForward(FWD_FAIL_INSERT, form);
         }
 
@@ -141,7 +153,7 @@ public class BarcodeConfigurationController extends BaseController {
         } catch (LIMSRuntimeException e) {
             result.reject("barcode.config.error.insert");
         } finally {
-            ConfigurationProperties.forceReload();
+            ConfigurationProperties.loadDBValuesIntoConfiguration();
         }
 
         if (result.hasErrors()) {
@@ -158,7 +170,7 @@ public class BarcodeConfigurationController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "BarcodeConfigurationDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/BarcodeConfiguration.do";
+            return "redirect:/BarcodeConfiguration";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "BarcodeConfigurationDefinition";
         } else {

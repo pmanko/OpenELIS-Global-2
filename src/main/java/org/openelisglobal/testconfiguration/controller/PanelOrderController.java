@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -164,7 +162,7 @@ public class PanelOrderController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "panelOrderDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/PanelOrder.do";
+            return "redirect:/PanelOrder";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "panelOrderDefinition";
         } else {

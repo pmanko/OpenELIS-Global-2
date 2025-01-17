@@ -1,7 +1,6 @@
 package org.openelisglobal.result.form;
 
 import java.util.List;
-
 import org.openelisglobal.common.form.BaseForm;
 import org.openelisglobal.common.paging.PagingBean;
 import org.openelisglobal.common.util.IdValuePair;
@@ -10,8 +9,8 @@ import org.openelisglobal.result.controller.StatusResultsController.DropPair;
 import org.openelisglobal.test.beanItems.TestResultItem;
 import org.openelisglobal.validation.annotations.ValidDate;
 
-//only used to communicate from server to client
-//does not require validation
+// only used to communicate from server to client
+// does not require validation
 public class StatusResultsForm extends BaseForm implements ResultsPagingForm {
     private PagingBean paging;
 
@@ -63,6 +62,9 @@ public class StatusResultsForm extends BaseForm implements ResultsPagingForm {
     private String testSectionId;
 
     private List<IdValuePair> referralOrganizations;
+
+    // for display
+    private List<IdValuePair> methods;
 
     public StatusResultsForm() {
         setFormName("StatusResultsForm");
@@ -270,4 +272,11 @@ public class StatusResultsForm extends BaseForm implements ResultsPagingForm {
         return false;
     }
 
+    public List<IdValuePair> getMethods() {
+        return methods;
+    }
+
+    public void setMethods(List<IdValuePair> methods) {
+        this.methods = methods;
+    }
 }

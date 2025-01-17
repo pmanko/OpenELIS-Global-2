@@ -21,9 +21,10 @@
 
 <%@ taglib prefix="ajax" uri="/tags/ajaxtags" %>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions"%>
+<%@ taglib prefix = "fmt" uri = "http://java.sun.com/jsp/jstl/fmt" %>
 
 
-<c:set var="testSection"	value='${form.testSection}' />
+<c:set var="testSection"	value='${form.testSection}'/>
 <c:set var="results" value="${form.resultList}" />
 <c:set var="pagingSearch" value='${form.paging.searchTermToPage}'/>
 <c:set var="testSectionsByName" value='${form.testSectionsByName}' />
@@ -35,6 +36,7 @@
 	String searchTerm = request.getParameter("searchTerm");
 	String url = request.getAttribute("javax.servlet.forward.servlet_path").toString();	
 	//boolean showTestSectionSelect = !ConfigurationProperties.getInstance().isPropertyValueEqual(Property.configurationName, "CI RetroCI");
+	String criticalMessage = ConfigurationProperties.getInstance().getPropertyValue(ConfigurationProperties.Property.customCriticalMessage);
 %>
 
 
@@ -50,11 +52,13 @@
 
 <script>
 var dirty = false;
-var pager = new OEPager('${form.formName}', '<spring:escapeBody javaScriptEscape="true">${(analyzerType == "") ? "" : "&type=" +=  analyzerType}</spring:escapeBody>');
-var pager = new OEPager('${form.formName}', '<spring:escapeBody javaScriptEscape="true">${(testSection == "") ? "" : "&type=" += testSection}</spring:escapeBody>' + '&test= <spring:escapeBody javaScriptEscape="true">testName</spring:escapeBody>');
+var pager = new OEPager('${form.formName}', '<c:if test="${not empty analyzerType}">&type=<spring:escapeBody javaScriptEscape="true">${analyzerType}</spring:escapeBody></c:if>');
+var pager = new OEPager('${form.formName}', '<c:if test="${not empty testSection}">&type=<spring:escapeBody javaScriptEscape="true">${testSection}</spring:escapeBody></c:if>' + '&test= <spring:escapeBody javaScriptEscape="true">testName</spring:escapeBody>');
 pager.setCurrentPageNumber('<c:out value="${form.paging.currentPage}"/>');
 
 var pageSearch; //assigned in post load function
+
+var criticalMsg = "<%=criticalMessage%>";
 
 var pagingSearch = {};
 
@@ -159,7 +163,7 @@ function savePage() {
 
     window.onbeforeunload = null; // Added to flag that formWarning alert isn't needed.
 	var form = document.getElementById("mainForm");
-	form.action = "ResultValidation.do" + '?type=<spring:escapeBody javaScriptEscape="true">${testSection}</spring:escapeBody>&test=<spring:escapeBody javaScriptEscape="true">${testName}</spring:escapeBody>&';
+	form.action = "ResultValidation" + '?type=<spring:escapeBody javaScriptEscape="true">${testSection}</spring:escapeBody>&test=<spring:escapeBody javaScriptEscape="true">${testName}</spring:escapeBody>&';
 	form.submit();
 }
 
@@ -196,7 +200,7 @@ function toggleSelectAll( element ) {
 }
 
 function updateLogValue(element, index ){
-	var logField = jQuery("log_" + index );
+	var logField = jQuery("#log_" + index );
 
 	if( logField ){
 		var logValue = Math.baseLog(element.value).toFixed(2);
@@ -207,6 +211,36 @@ function updateLogValue(element, index ){
 			jQuery(logField).html(logValue);
 		}
 	}
+}
+
+function toggleSampleSelectAll( element,groupingNumber ) {
+    var index, item, checkboxes,matchedCheckboxes;
+
+	if (element.id == "sampleAccepted_" + groupingNumber ) {
+		 checkboxes = jQuery(".accepted_" + groupingNumber);
+		 matchedCheckboxes = jQuery(".rejected_" + groupingNumber);
+
+	} else if (element.id == "sampleRejected_" + groupingNumber) {
+		checkboxes = jQuery(".rejected_" + groupingNumber);
+		 matchedCheckboxes = jQuery(".accepted_" + groupingNumber);
+	} 
+
+	if (element.checked == true ) {
+		for (index = 0; index < checkboxes.length; ++index) {
+			  item = checkboxes[index];
+			  item.checked = true;
+		}
+		for (index = 0; index < matchedCheckboxes.length; ++index) {
+			  item = matchedCheckboxes[index];
+			  item.checked = false;
+		}
+	} else if (element.checked == false ) {
+		for (index = 0; index < checkboxes.length; ++index) {
+			  item = checkboxes[index];
+			  item.checked = false;
+		}
+	}
+
 }
 
 function trim(element, significantDigits){
@@ -287,12 +321,23 @@ function altAccessionHighlightSearch(accessionNumber) {
 	if (confirm('Searching for an individual Lab no will take you to a new page.\n\nUnsaved data on this page will be lost.\n\nWould you like to continue?')) {
 		window.onbeforeunload = null;
 		var params = new URLSearchParams("accessionNumber=" + accessionNumber);
-		window.location = "AccessionValidation.do?" + params.toString();
+		window.location = "AccessionValidation?" + params.toString();
 	}
 }
 
+function validateCriticalResults(index,lowCritical,highCritical){
+	var elementVal;
+	var elementt = jQuery("#resultId_" + index);
+	elementVal = elementt.val();
+	console.log(elementVal);
+	if (elementVal > lowCritical && elementVal < highCritical) {
+		    elementt.addClass("error");
+            alert(criticalMsg);
+            return;
+        }
+  }
 </script>
-
+<c:set var="total" value="${form.paging.totalPages}"/>
 <c:if test="${resultCount != 0}">
 <div  style="width:80%" >
 	<form:hidden path="paging.currentPage" id="currentPageID" />
@@ -320,12 +365,12 @@ function altAccessionHighlightSearch(accessionNumber) {
 	       id="labnoSearch"
 	       placeholder='<spring:message code="sample.search.scanner.instructions"/>'
 	       maxlength='<%= Integer.toString(AccessionNumberUtil.getMaxAccessionLength())%>' />
-	<input type="button" onclick="pageSearch.doLabNoSearch(document.getElementById('labnoSearch'))" value='<%= MessageUtil.getMessage("label.button.search") %>'>
+	<input type="button" onclick="pageSearch.doLabNoSearch(document.getElementById('labnoSearch'));" value='<%= MessageUtil.getMessage("label.button.search") %>'>
 	</span>
 </div>
 </c:if>
-<form:hidden path="testSection" value="${param.type}"/>
-<form:hidden path="testName" value="${param.test}"/>
+<form:hidden path="testSection"/>
+<form:hidden path="testName"/>
 <c:if test="${resultCount != 0}">
 <Table style="width:80%" >
     <tr>
@@ -352,7 +397,7 @@ function altAccessionHighlightSearch(accessionNumber) {
 				id="selectAllAccept"
 				class="accepted acceptAll">
 		</th>
-		<th  style="text-align:center;width:3%;" style="background-color: white">&nbsp;
+		<th  style="text-align:center;width:resultCount3%;" style="background-color: white">&nbsp;
 		<spring:message code="validation.reject.all" />
 			<input type="checkbox"
 					name="selectAllReject"
@@ -418,15 +463,20 @@ function altAccessionHighlightSearch(accessionNumber) {
 					<form:checkbox path="resultList[${iter.index}].sampleIsAccepted"
 								   id='sampleAccepted_${resultList.sampleGroupingNumber}'
 								   cssClass="accepted"
+								   value="on"
+								   name="sampleAccepted_${resultList.sampleGroupingNumber}'"
 								   onchange="markUpdated(); makeDirty();" 
-								   onclick='acceptSample( this, "${resultList.sampleGroupingNumber}");' />
+								   onclick='toggleSampleSelectAll(this,"${resultList.sampleGroupingNumber}");'/>
 				</td>
 				<td style="text-align:center">
 					<form:checkbox path="resultList[${iter.index}].sampleIsRejected"
 								   id='sampleRejected_${resultList.sampleGroupingNumber}'
 								   cssClass="rejected"
+								   value="on"
+								   name="sampleRejected_${resultList.sampleGroupingNumber}'"
 								   onchange="markUpdated(); makeDirty();"
-								   onclick='rejectSample( this, "${resultList.sampleGroupingNumber}");' />
+								   onclick='toggleSampleSelectAll(this,"${resultList.sampleGroupingNumber}");'
+								  />
 				</td>
 				<td>&nbsp;</td>
 			</tr>
@@ -543,7 +593,10 @@ function altAccessionHighlightSearch(accessionNumber) {
 						<br/>
 						<div id='log_${iter.index}'
 								class='results-readonly'>
-								${resultList.result}
+							<c:catch var="logConversionException">
+								<fmt:formatNumber maxFractionDigits="2" value = "${Math.log10(resultList.result)}" type="number" />
+							</c:catch>
+							<c:if test = "${logConversionException != null}"> -- </c:if>  
 								<%-- <% try{
 												Double value = Math.log10(Double.parseDouble(resultList.getResult()));
 												DecimalFormat twoDForm = new DecimalFormat("##.##");
@@ -559,7 +612,8 @@ function altAccessionHighlightSearch(accessionNumber) {
 								   id='accepted_${iter.index}'
 								   cssClass='accepted accepted_${resultList.sampleGroupingNumber} ${resultList.normal ? "normalAccepted" : "" }'
 								   onchange="markUpdated(); makeDirty();"
-								   onclick='enableDisableCheckboxes("rejected_${iter.index}", "${resultList.sampleGroupingNumber}");' 
+								   onclick='enableDisableCheckboxes("rejected_${iter.index}", "${resultList.sampleGroupingNumber}");
+								    validateCriticalResults("${iter.index}","${resultList.lowerCritical}","${resultList.higherCritical}");' 
 								   />
 				</td>
 				<td style="text-align:center">

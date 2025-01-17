@@ -2,10 +2,8 @@ package org.openelisglobal.login.controller;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.openelisglobal.common.constants.Constants;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
@@ -50,7 +48,7 @@ public class ChangePasswordLoginController extends BaseController {
     @RequestMapping(value = "/ChangePasswordLogin", method = RequestMethod.GET)
     public ModelAndView showChangePasswordLogin(HttpServletRequest request) {
         ChangePasswordLoginForm form = new ChangePasswordLoginForm();
-        form.setFormAction("ChangePasswordLogin.do");
+        form.setFormAction("ChangePasswordLogin");
         return findForward(FWD_SUCCESS, form);
     }
 
@@ -64,9 +62,9 @@ public class ChangePasswordLoginController extends BaseController {
             return findForward(FWD_FAIL_INSERT, form);
         }
 
-//		Login newLogin = new Login();
-//		// populate valueholder from form
-//		PropertyUtils.copyProperties(newLogin, form);
+        // Login newLogin = new Login();
+        // // populate valueholder from form
+        // PropertyUtils.copyProperties(newLogin, form);
         try {
             LoginUser login;
             // get user information if password correct
@@ -89,7 +87,7 @@ public class ChangePasswordLoginController extends BaseController {
 
         } catch (LIMSRuntimeException e) {
             // bugzilla 2154
-            LogEvent.logError(e.toString(), e);
+            LogEvent.logError(e);
             result.reject("login.error.message");
         }
         if (result.hasErrors()) {
@@ -107,7 +105,7 @@ public class ChangePasswordLoginController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "loginChangePasswordDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/LoginPage.do";
+            return "redirect:/LoginPage";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "loginChangePasswordDefinition";
         } else {

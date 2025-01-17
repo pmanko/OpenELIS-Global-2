@@ -23,6 +23,8 @@ public class ResultLimitBean {
     private String ageRange;
     private String normalRange;
     private String validRange;
+    private String reportingRange;
+    private String criticalRange;
 
     public String getGender() {
         return gender;
@@ -54,5 +56,21 @@ public class ResultLimitBean {
 
     public void setValidRange(String validRange) {
         this.validRange = validRange;
+    }
+
+    public String getReportingRange() {
+        return reportingRange;
+    }
+
+    public void setReportingRange(String reportingRange) {
+        this.reportingRange = reportingRange;
+    }
+
+    public String getCriticalRange() {
+        return criticalRange;
+    }
+
+    public void setCriticalRange(String criticalRange) {
+        this.criticalRange = criticalRange;
     }
 }

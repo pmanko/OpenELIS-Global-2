@@ -1,7 +1,6 @@
 package org.openelisglobal.result.form;
 
 import java.util.List;
-
 import org.openelisglobal.common.form.BaseForm;
 import org.openelisglobal.common.paging.PagingBean;
 import org.openelisglobal.common.util.IdValuePair;
@@ -60,6 +59,9 @@ public class PatientResultsForm extends BaseForm implements PatientInfoForm, Res
     private Boolean warning;
 
     private List<IdValuePair> referralOrganizations;
+
+    // for display
+    private List<IdValuePair> methods;
 
     public PatientResultsForm() {
         setFormName("PatientResultsForm");
@@ -281,4 +283,11 @@ public class PatientResultsForm extends BaseForm implements PatientInfoForm, Res
         return false;
     }
 
+    public List<IdValuePair> getMethods() {
+        return methods;
+    }
+
+    public void setMethods(List<IdValuePair> methods) {
+        this.methods = methods;
+    }
 }

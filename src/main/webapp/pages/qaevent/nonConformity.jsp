@@ -71,7 +71,7 @@ function /*void*/loadForm() {
 	if (!$("searchId").value.empty()) {
 		var form = document.getElementById("mainForm");
 
-		form.action = "NonConformity.do?labNo=" + $("searchId").value;
+		form.action = "NonConformity?labNo=" + $("searchId").value;
 		form.method = "GET";
 
 		form.submit();
@@ -460,8 +460,15 @@ function  processPhoneSuccess(xhr){
 					<tr>
 						<td><%= MessageUtil.getContextualMessage("sample.entry.project.siteName") %>
 						<td>
+    		            	<spring:message code="error.site.invalid" var="invalidSite"/>
+    		           		<spring:message code="sample.entry.project.siteMaxMsg" var="siteMaxMessage"/>
 							<form:select path="service" id="site"
-									     onchange="makeDirty();$('serviceNew').value = true;">
+									     onchange="makeDirty();$('serviceNew').value = true;"
+		                    capitalize="true"
+		                    invalidlabid='${invalidSite}'
+		                    maxrepmsg='${siteMaxMessage}'
+		       			    clearNonMatching="false"
+		       			    >
 								<option value=""></option>
 								<form:options items="${form.siteList}" itemLabel="value" itemValue="id" />
 						   	</form:select>
@@ -779,7 +786,7 @@ function savePage() {
 	var form = document.getElementById("mainForm");
   
 	window.onbeforeunload = null; // Added to flag that formWarning alert isn't needed.
-	form.action = "NonConformity.do";
+	form.action = "NonConformity";
 	form.submit();
 }
 
@@ -791,13 +798,9 @@ tweekSampleTypeOptions();
 jQuery(document).ready( function() {
      	var dropdown = jQuery( "select#site" );
         autoCompleteWidth = dropdown.width() + 66 + 'px';
-        clearNonMatching = false;
-        capitialize = true;
         dropdown.combobox();
-       // invalidLabID = '<spring:message code="error.site.invalid"/>'; // Alert if value is typed that's not on list. FIX - add badmessage icon
-        maxRepMsg = '<spring:message code="sample.entry.project.siteMaxMsg"/>'; 
         
-        resultCallBack = function( textValue) {
+        autocompleteResultCallBack = function( selectId, textValue) {
   				siteListChanged(textValue);
   				makeDirty();
   				setSave();

@@ -8,8 +8,9 @@ public class FormField {
 
     private String labelKey;
 
-    public FormField() {
+    private String label;
 
+    public FormField() {
     }
 
     public FormField(String labelKey) {
@@ -47,6 +48,14 @@ public class FormField {
         this.labelKey = labelKey;
     }
 
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
     public boolean getRequired() {
         return required;
     }
@@ -54,5 +63,4 @@ public class FormField {
     public void setRequired(boolean required) {
         this.required = required;
     }
-
 }

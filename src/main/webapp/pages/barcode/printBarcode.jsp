@@ -12,7 +12,6 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 
 <%@ taglib prefix="ajax" uri="/tags/ajaxtags" %>
-<%@ taglib prefix="tiles" uri="http://tiles.apache.org/tags-tiles"%>	     
 
 <c:set var="localDBOnly" value='<%=Boolean.toString(ConfigurationProperties.getInstance().getPropertyValueLowerCase(Property.UseExternalPatientInfo).equals("false"))%>'/>
 
@@ -276,7 +275,7 @@ function handleSelectedPatient(){
 
     $("searchResultsDiv").style.display = "none";
     var form = document.getElementById("mainForm");
-    form.action = '${form.formAction}' + ".do?";
+    form.action = '${form.formAction}' + "?";
     if( !(typeof requestType === 'undefined') ){
         form.action += "&type=" + requestType;
     }
@@ -322,12 +321,12 @@ function printBarcode(button) {
     }
 
     function finish() {
-        window.location = "Dashboard.do";
+        window.location = "Dashboard";
     }
 </script>
 
 <!-- new for pre-printing -->
-<tiles:insertAttribute name="prePrinting"/>
+<jsp:include page="${prePrintingFragment}"/>
 
 <!-- end new for pre-printing -->
 

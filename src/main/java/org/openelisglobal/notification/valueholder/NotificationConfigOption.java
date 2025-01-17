@@ -1,7 +1,7 @@
 package org.openelisglobal.notification.valueholder;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
-
 import javax.persistence.CascadeType;
 import javax.persistence.CollectionTable;
 import javax.persistence.Column;
@@ -19,10 +19,7 @@ import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-
 import org.openelisglobal.common.valueholder.BaseObject;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "notification_config_option")
@@ -78,14 +75,13 @@ public class NotificationConfigOption extends BaseObject<Integer> {
     private boolean active;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name="additional_contacts", joinColumns=@JoinColumn(name="notification_config_option_id"))
-    @Column(name="contact")
+    @CollectionTable(name = "additional_contacts", joinColumns = @JoinColumn(name = "notification_config_option_id"))
+    @Column(name = "contact")
     @JsonIgnore
     private List<String> additionalContacts;
 
     public NotificationConfigOption(NotificationMethod methodType, NotificationPersonType personType,
-            NotificationNature notificationNature,
-            boolean active) {
+            NotificationNature notificationNature, boolean active) {
         this.notificationMethod = methodType;
         this.notificationPersonType = personType;
         this.notificationNature = notificationNature;
@@ -93,7 +89,6 @@ public class NotificationConfigOption extends BaseObject<Integer> {
     }
 
     public NotificationConfigOption() {
-
     }
 
     @Override
@@ -153,5 +148,4 @@ public class NotificationConfigOption extends BaseObject<Integer> {
     public void setAdditionalContacts(List<String> additionalContacts) {
         this.additionalContacts = additionalContacts;
     }
-
 }

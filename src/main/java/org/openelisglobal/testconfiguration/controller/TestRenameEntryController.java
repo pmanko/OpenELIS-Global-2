@@ -2,7 +2,6 @@ package org.openelisglobal.testconfiguration.controller;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
 import org.openelisglobal.common.log.LogEvent;
@@ -41,7 +40,7 @@ public class TestRenameEntryController extends BaseController {
 
     @RequestMapping(value = "/TestRenameEntry", method = RequestMethod.GET)
     public ModelAndView showTestRenameEntry(HttpServletRequest request) {
-        LogEvent.logInfo(this.getClass().getName(), "method unkown",
+        LogEvent.logInfo(this.getClass().getSimpleName(), "method unkown",
                 "Hibernate Version: " + org.hibernate.Version.getVersionString());
         String forward = FWD_SUCCESS;
         TestRenameEntryForm form = new TestRenameEntryForm();
@@ -56,7 +55,7 @@ public class TestRenameEntryController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "testRenameDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/TestRenameEntry.do";
+            return "redirect:/TestRenameEntry";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "testRenameDefinition";
         } else {
@@ -73,7 +72,7 @@ public class TestRenameEntryController extends BaseController {
             return findForward(FWD_FAIL_INSERT, form);
         }
 
-        form.setCancelAction("CancelDictionary.do");
+        form.setCancelAction("CancelDictionary");
 
         String testId = form.getTestId();
         String nameEnglish = form.getNameEnglish();
@@ -105,9 +104,8 @@ public class TestRenameEntryController extends BaseController {
             try {
                 localizationService.updateTestNames(name, reportingName);
             } catch (LIMSRuntimeException e) {
-                LogEvent.logErrorStack(e);
+                LogEvent.logError(e);
             }
-
         }
 
         // Refresh test names

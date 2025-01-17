@@ -2,15 +2,14 @@ package org.openelisglobal.sample.service;
 
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import javax.annotation.PostConstruct;
-
 import org.openelisglobal.analysis.service.AnalysisService;
 import org.openelisglobal.analysis.valueholder.Analysis;
-import org.openelisglobal.common.service.BaseObjectServiceImpl;
+import org.openelisglobal.common.service.AuditableBaseObjectServiceImpl;
 import org.openelisglobal.common.services.IStatusService;
 import org.openelisglobal.common.services.StatusService;
 import org.openelisglobal.common.services.StatusService.AnalysisStatus;
@@ -31,6 +30,7 @@ import org.openelisglobal.requester.valueholder.RequesterType;
 import org.openelisglobal.requester.valueholder.SampleRequester;
 import org.openelisglobal.sample.dao.SampleAdditionalFieldDAO;
 import org.openelisglobal.sample.dao.SampleDAO;
+import org.openelisglobal.sample.valueholder.OrderPriority;
 import org.openelisglobal.sample.valueholder.Sample;
 import org.openelisglobal.sample.valueholder.SampleAdditionalField;
 import org.openelisglobal.sample.valueholder.SampleAdditionalField.AdditionalFieldName;
@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @DependsOn({ "springContext" })
-public class SampleServiceImpl extends BaseObjectServiceImpl<Sample, String> implements SampleService {
+public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, String> implements SampleService {
 
     private static String TABLE_REFERENCE_ID;
 
@@ -371,7 +371,6 @@ public class SampleServiceImpl extends BaseObjectServiceImpl<Sample, String> imp
                     .equals(analysisList.get(j).getSampleItem().getSample().getAccessionNumber())) {
                 previousSample = analysisList.get(j + 1).getSampleItem().getSample();
             }
-
         }
 
         /*
@@ -385,14 +384,12 @@ public class SampleServiceImpl extends BaseObjectServiceImpl<Sample, String> imp
          * }
          */
         return previousSample;
-
     }
 
     @Override
     @Transactional(readOnly = true)
     public void getData(Sample sample) {
         getBaseObjectDAO().getData(sample);
-
     }
 
     @Override
@@ -505,7 +502,6 @@ public class SampleServiceImpl extends BaseObjectServiceImpl<Sample, String> imp
                     sample.getAccessionNumber().substring(0, sample.getAccessionNumber().indexOf('.')));
         }
         getBaseObjectDAO().getSampleByAccessionNumber(sample);
-
     }
 
     @Override
@@ -558,6 +554,17 @@ public class SampleServiceImpl extends BaseObjectServiceImpl<Sample, String> imp
 
     @Override
     @Transactional(readOnly = true)
+    public boolean sampleContainsTestWithLoinc(String sampleId, String loinc) {
+        for (Analysis curAnalysis : analysisService.getAnalysesBySampleId(sampleId)) {
+            if (curAnalysis.getTest().getLoinc().equals(loinc)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Sample> getAllMissingFhirUuid() {
         return sampleDAO.getAllMissingFhirUuid();
     }
@@ -567,4 +574,21 @@ public class SampleServiceImpl extends BaseObjectServiceImpl<Sample, String> imp
         return sampleDAO.getSamplesByAnalysisIds(analysisIds);
     }
 
+    @Override
+    public List<Sample> getSamplesForSiteBetweenOrderDates(String referringSiteId, LocalDate lowerDate,
+            LocalDate upperDate) {
+        return sampleDAO.getSamplesForSiteBetweenOrderDates(referringSiteId, lowerDate, upperDate);
+    }
+
+    @Override
+    public List<Sample> getStudySamplesForSiteBetweenOrderDates(String referringSiteId, LocalDate lowerDate,
+            LocalDate upperDate) {
+        return sampleDAO.getStudySamplesForSiteBetweenOrderDates(referringSiteId, lowerDate, upperDate);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Sample> getSamplesByPriority(OrderPriority priority) {
+        return sampleDAO.getSamplesByPriority(priority);
+    }
 }

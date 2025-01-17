@@ -19,7 +19,7 @@
 	
 function setMyCancelAction(){
 	var form = document.getElementById("mainForm");
-	form.action = "CancelResultReportingConfiguration.do";
+	form.action = "CancelResultReportingConfiguration";
 	form.submit();
 	return true;	
 }
@@ -27,7 +27,7 @@ function setMyCancelAction(){
 function savePage(){
 	if( formValid() ){
 		var form = document.getElementById("mainForm");
-		form.action = "ResultReportingConfiguration.do";
+		form.action = "ResultReportingConfiguration";
 		form.submit();
 		return true;		
 	}
@@ -49,10 +49,6 @@ function /*boolean*/ hasRequriedValues(){
 	//}
 	
 	return true;	
-}
-
-function testConnection( identifier){
-	testConnectionOnServer(identifier, jQuery("#" + identifier).val(), processTestSuccess);
 }
 
 function  /*void*/ processTestSuccess(xhr){
@@ -90,12 +86,6 @@ function  /*void*/ processTestSuccess(xhr){
     			   id = "${reports.connectionTestIdentifier}"
     			   size="80" />
     </td>
-    <c:if test="${not empty reports.connectionTestIdentifier}">
-    <td>
-		<input type="button" value='<spring:message code="connection.test.button"/>' onclick='testConnection( "${reports.connectionTestIdentifier}");' >
-		<spring:message code="connection.test.button.message"/> 
-    </td>
-    </c:if>
   </tr>
   <c:if test="${resports.isScheduled}">
   <tr>

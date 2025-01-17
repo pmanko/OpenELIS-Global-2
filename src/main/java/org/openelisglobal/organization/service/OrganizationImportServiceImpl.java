@@ -1,5 +1,7 @@
 package org.openelisglobal.organization.service;
 
+import ca.uhn.fhir.rest.client.api.IGenericClient;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -8,9 +10,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import javax.transaction.Transactional;
-
 import org.apache.commons.validator.GenericValidator;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.Bundle;
@@ -29,11 +28,10 @@ import org.openelisglobal.organization.valueholder.Organization;
 import org.openelisglobal.organization.valueholder.OrganizationType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.rest.client.api.IGenericClient;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrganizationImportServiceImpl implements OrganizationImportService {
@@ -41,8 +39,18 @@ public class OrganizationImportServiceImpl implements OrganizationImportService 
     @Value("${org.openelisglobal.facilitylist.fhirstore:}")
     private String facilityFhirStore;
 
-    @Autowired
-    private FhirContext fhirContext;
+    @Value("${org.openelisglobal.facilitylist.authurl:}")
+    private String facilityAuthUrl;
+
+    @Value("${org.openelisglobal.facilitylist.username:}")
+    private String facilityUserName;
+
+    @Value("${org.openelisglobal.facilitylist.password:}")
+    private String facilityPassword;
+
+    @Value("${org.openelisglobal.facilitylist.auth:basic}")
+    private String facilityAuth;
+
     @Autowired
     private FhirUtil fhirUtil;
     @Autowired
@@ -56,10 +64,18 @@ public class OrganizationImportServiceImpl implements OrganizationImportService 
 
     @Override
     @Transactional
-    @Scheduled(initialDelay = 1000, fixedRate = 24 * 60 * 60 * 1000)
-    public void importOrganizationList() throws FhirGeneralException {
+    @Async
+    @Scheduled(initialDelay = 1000, fixedRateString = "${facilitylist.schedule.fixedRate}")
+    public void importOrganizationList() throws FhirGeneralException, IOException {
         if (!GenericValidator.isBlankOrNull(facilityFhirStore)) {
-            IGenericClient client = fhirUtil.getFhirClient(facilityFhirStore);
+            IGenericClient client;
+            if (facilityAuth.equals("token")) {
+                String token = fhirUtil.getAccessToken(facilityAuthUrl, facilityUserName, facilityPassword);
+                client = fhirUtil.getFhirClient(facilityFhirStore, token);
+            } else {
+                client = fhirUtil.getFhirClient(facilityFhirStore);
+            }
+
             List<Bundle> responseBundles = new ArrayList<>();
             Bundle responseBundle = client.search().forResource(org.hl7.fhir.r4.model.Organization.class)
                     .returnBundle(Bundle.class).execute();
@@ -148,36 +164,34 @@ public class OrganizationImportServiceImpl implements OrganizationImportService 
 
         for (OrganizationObjects organizationObjects : organizationObjectsByOrgUUID.values()) {
             try {
-            Organization curOrganization = organizationObjects.organization;
-            // ensure the parent org is in the db
-            if (!GenericValidator.isBlankOrNull(organizationObjects.parentUUID)) {
-                Organization dbParentOrg;
-                if (dbOrgsByUUID.containsKey(organizationObjects.parentUUID)) {
-                    dbParentOrg = dbOrgsByUUID.get(organizationObjects.parentUUID);
-                } else {
-                    dbParentOrg = insertOrUpdateOrganization(
-                            organizationObjectsByOrgUUID.get(organizationObjects.parentUUID).organization);
-                    dbOrgsByUUID.put(organizationObjects.parentUUID, dbParentOrg);
+                Organization curOrganization = organizationObjects.organization;
+                // ensure the parent org is in the db
+                if (!GenericValidator.isBlankOrNull(organizationObjects.parentUUID)) {
+                    Organization dbParentOrg;
+                    if (dbOrgsByUUID.containsKey(organizationObjects.parentUUID)) {
+                        dbParentOrg = dbOrgsByUUID.get(organizationObjects.parentUUID);
+                    } else {
+                        dbParentOrg = insertOrUpdateOrganization(
+                                organizationObjectsByOrgUUID.get(organizationObjects.parentUUID).organization);
+                        dbOrgsByUUID.put(organizationObjects.parentUUID, dbParentOrg);
+                    }
+                    // set the parent org to the db parent org
+                    curOrganization.setOrganization(dbParentOrg);
                 }
-                // set the parent org to the db parent org
-                curOrganization.setOrganization(dbParentOrg);
-            }
 
-            // save this org with all it's db pointers set
-            Organization dbOrg = insertOrUpdateOrganization(curOrganization);
-            dbOrgsByUUID.put(dbOrg.getFhirUuidAsString(), dbOrg);
-            for (String orgTypeName : organizationObjects.organizationTypeNames) {
-                OrganizationType orgType = dbOrgTypesByName.get(orgTypeName);
-                dbOrg.getOrganizationTypes().add(orgType);
-                orgType.getOrganizations().add(dbOrg);
-            }
+                // save this org with all it's db pointers set
+                Organization dbOrg = insertOrUpdateOrganization(curOrganization);
+                dbOrgsByUUID.put(dbOrg.getFhirUuidAsString(), dbOrg);
+                for (String orgTypeName : organizationObjects.organizationTypeNames) {
+                    OrganizationType orgType = dbOrgTypesByName.get(orgTypeName);
+                    dbOrg.getOrganizationTypes().add(orgType);
+                    orgType.getOrganizations().add(dbOrg);
+                }
             } catch (LIMSRuntimeException e) {
                 LogEvent.logError(e);
-                LogEvent.logError(this.getClass().getName(), "",
-                        "error importing an organization with id: "
-                                + organizationObjects.organization.getFhirUuidAsString());
+                LogEvent.logError(this.getClass().getSimpleName(), "", "error importing an organization with id: "
+                        + organizationObjects.organization.getFhirUuidAsString());
             }
-
         }
 
         // import fhir organizations as is
@@ -220,5 +234,4 @@ public class OrganizationImportServiceImpl implements OrganizationImportService 
         public String parentUUID;
         public Set<String> organizationTypeNames;
     }
-
 }

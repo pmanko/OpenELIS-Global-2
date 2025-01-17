@@ -12,7 +12,6 @@
 
 <%@ taglib prefix="ajax" uri="/tags/ajaxtags" %>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions"%>
-<%@ taglib prefix="tiles" uri="http://tiles.apache.org/tags-tiles"%>	 
 
 <c:set var="cancelableResults" value="${form.ableToCancelResults}"/>
 
@@ -38,6 +37,7 @@ var checkedCount = 0;
 var currentSampleType;
 var sampleIdStart = 0;
 var orderChanged = false;
+var currentReferalDiv ;
 
 //This handles the case where sampleAdd.jsp tile is not used.  Will be overridden in sampleAdd.jsp
 function samplesHaveBeenAdded(){ return false;}
@@ -99,7 +99,7 @@ function /*void*/ savePage(){
 	loadSamples();
 	
 	var form = document.getElementById("mainForm");
-	form.action = "SampleEdit.do";
+	form.action = "SampleEdit";
 	form.submit();
 }
 
@@ -267,6 +267,41 @@ jQuery( document ).ready( function() {
 	jQuery('#orderDisplay').show();
 });
 </script>
+<script>
+function showHideSection(button, targetId){
+    targetId = targetId+button.name
+    if( button.value == "+" ){
+        showSection(button, targetId);
+    }else{
+        hideSection(button, targetId);
+    }
+}
+
+function showSection( button, targetId){
+    jQuery("#" + targetId ).show();
+    button.value = "-";
+}
+
+function hideSection( button, targetId){
+    jQuery("#" + targetId ).hide();
+    button.value = "+";
+}
+
+var counter = 0;
+function addSampleTable(){
+    counter ++
+    var content = $("addSampleTemplate").innerHTML;
+    var newTable = document.createElement('table');
+    newTable.style = "width:100%";
+    newTable.innerHTML = content;
+    var inputShowHide = newTable.getElementsByTagName("input")[0];
+    inputShowHide.name = counter ;
+    var divSampleDisplay = newTable.getElementsByTagName("div")[0];
+    divSampleDisplay.id = "samplesDisplay_" + counter;
+    $("samplesBlock").appendChild(newTable);
+	$("saveButtonId").disabled = false;
+}
+</script>
 
 <hr/>
 
@@ -303,10 +338,10 @@ jQuery( document ).ready( function() {
 </c:if>
     <div id="sampleOrder" class="colorFill" >
 <%--     	<c:if test="${form.isConfirmationSample}"> --%>
-<%--         	<tiles:insertAttribute name="sampleConfirmationOrder" /> --%>
+<%--         	<jsp:include page="${sampleConfirmationOrderFragment}"/> --%>
 <%--         </c:if> --%>
     	<c:if test="${not form.isConfirmationSample}">
-        	<tiles:insertAttribute name="sampleOrder" />
+        	<jsp:include page="${sampleOrderFragment}"/>
         </c:if>
     </div>
 
@@ -462,15 +497,32 @@ jQuery( document ).ready( function() {
 <hr>
 <h1><spring:message code="sample.entry.addSample" /></h1>
 
-<div id="samplesDisplay" class="colorFill" >
-	<tiles:insertAttribute name="addSample"/>
+<%-- <div id="samplesDisplay" class="colorFill" >
+	<jsp:include page="${addSampleFragment}"/>
+</div> --%>
+<table id = "addSampleTemplate"  style="display:none;">
+     <tr>
+        <td >
+            <input type="button" name="showHide" value="-" onclick="showHideSection(this, 'samplesDisplay_');" id="samplesSectionId">
+            <%= MessageUtil.getContextualMessage("sample.entry.sampleList.label") %>
+            <span class="requiredlabel">*</span>
+
+            <div id="samplesDisplay_0" class="colorFill" >
+                <jsp:include page="${addSampleFragment}"/>
+            </div>
+           <hr >
+        </td>
+    </tr> 
+</table>
+<div id = "samplesBlock" style="width:100%">
 </div>
+<button type="button" onclick="addSampleTable();"><spring:message code="sample.entry.sample.new"/></button>
 </c:if>
 </c:if>
 <c:if test="${form.noSampleFound}">
 	<spring:message code="sample.edit.sample.notFound"/>
 </c:if>
-
+<form:hidden  path="sampleXML"  id="sampleXML"/>
 <script type="text/javascript" >
 
     function setSaveButton(){

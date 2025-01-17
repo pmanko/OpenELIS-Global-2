@@ -1,15 +1,18 @@
 package org.openelisglobal.testconfiguration.service;
 
 import java.util.List;
-
 import org.openelisglobal.localization.service.LocalizationService;
 import org.openelisglobal.localization.valueholder.Localization;
+import org.openelisglobal.panel.service.PanelService;
+import org.openelisglobal.panel.valueholder.Panel;
 import org.openelisglobal.panelitem.service.PanelItemService;
 import org.openelisglobal.panelitem.valueholder.PanelItem;
 import org.openelisglobal.resultlimit.service.ResultLimitService;
 import org.openelisglobal.resultlimits.valueholder.ResultLimit;
+import org.openelisglobal.test.service.TestSectionService;
 import org.openelisglobal.test.service.TestService;
 import org.openelisglobal.test.valueholder.Test;
+import org.openelisglobal.test.valueholder.TestSection;
 import org.openelisglobal.testconfiguration.controller.TestAddController.TestSet;
 import org.openelisglobal.testresult.service.TestResultService;
 import org.openelisglobal.testresult.valueholder.TestResult;
@@ -31,11 +34,15 @@ public class TestAddServiceImpl implements TestAddService {
     @Autowired
     private TestService testService;
     @Autowired
+    private TestSectionService testSectionService;
+    @Autowired
     private ResultLimitService resultLimitService;
     @Autowired
     private TestResultService testResultService;
     @Autowired
     private TypeOfSampleService typeOfSampleService;
+    @Autowired
+    private PanelService panelService;
 
     @Override
     @Transactional
@@ -51,6 +58,13 @@ public class TestAddServiceImpl implements TestAddService {
             set.test.setLocalizedTestName(nameLocalization);
             set.test.setLocalizedReportingName(reportingNameLocalization);
             testService.insert(set.test);
+
+            TestSection testSection = set.test.getTestSection();
+            if ("N".equals(testSection.getIsActive())) {
+                testSection.setIsActive("Y");
+                testSection.setSysUserId(currentUserId);
+                testSectionService.update(testSection);
+            }
 
             for (Test test : set.sortedTests) {
                 test.setSysUserId(currentUserId);
@@ -68,6 +82,14 @@ public class TestAddServiceImpl implements TestAddService {
                 item.setSysUserId(currentUserId);
                 item.setTest(set.test);
                 panelItemService.insert(item);
+                if (item.getPanel() != null) {
+                    Panel panel = item.getPanel();
+                    if ("N".equals(panel.getIsActive())) {
+                        panel.setIsActive("Y");
+                        panel.setSysUserId(currentUserId);
+                        panelService.update(panel);
+                    }
+                }
             }
 
             for (TestResult testResult : set.testResults) {
@@ -79,14 +101,11 @@ public class TestAddServiceImpl implements TestAddService {
                 }
             }
 
-
             for (ResultLimit resultLimit : set.resultLimits) {
                 resultLimit.setSysUserId(currentUserId);
                 resultLimit.setTestId(set.test.getId());
                 resultLimitService.insert(resultLimit);
             }
         }
-
     }
-
 }

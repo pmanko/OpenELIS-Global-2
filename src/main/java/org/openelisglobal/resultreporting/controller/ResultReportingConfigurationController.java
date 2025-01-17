@@ -3,9 +3,7 @@ package org.openelisglobal.resultreporting.controller;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
@@ -39,8 +37,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class ResultReportingConfigurationController extends BaseController {
 
     private static final String[] ALLOWED_FIELDS = new String[] { "reports*.enabledId", "reports*.enabled",
-            "reports*.urlId", "reports*.url", "reports*.scheduleHours", "reports*.scheduleMin",
-            "reports*.userName", "reports*.password", };
+            "reports*.urlId", "reports*.url", "reports*.scheduleHours", "reports*.scheduleMin", "reports*.userName",
+            "reports*.password", };
 
     @Autowired
     private SiteInformationService siteInformationService;
@@ -107,7 +105,7 @@ public class ResultReportingConfigurationController extends BaseController {
             return findForward(FWD_FAIL_INSERT, form);
         }
 
-        ConfigurationProperties.forceReload();
+        ConfigurationProperties.loadDBValuesIntoConfiguration();
         SpringContext.getBean(SchedulerConfig.class).reloadSchedules();
 
         redirectAttributes.addFlashAttribute(FWD_SUCCESS, true);
@@ -170,7 +168,7 @@ public class ResultReportingConfigurationController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "resultReportingConfigurationDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/MasterListsPage.do";
+            return "redirect:/MasterListsPage";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "resultReportingConfigurationDefinition";
         } else {

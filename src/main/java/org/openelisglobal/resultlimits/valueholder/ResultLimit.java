@@ -11,11 +11,15 @@ public class ResultLimit extends BaseObject<String> {
     private String resultTypeId;
     private String gender;
     private double minAge = 0;
+    private double highCritical = Double.POSITIVE_INFINITY;
+    private double lowCritical = Double.POSITIVE_INFINITY;
     private double maxAge = Double.POSITIVE_INFINITY;
     private double lowNormal = Double.NEGATIVE_INFINITY;
     private double highNormal = Double.POSITIVE_INFINITY;
     private double lowValid = Double.NEGATIVE_INFINITY;
     private double highValid = Double.POSITIVE_INFINITY;
+    private double lowReportingRange = Double.NEGATIVE_INFINITY;
+    private double highReportingRange = Double.POSITIVE_INFINITY;
     private String dictionaryNormalId;
     private boolean alwaysValidate;
 
@@ -79,6 +83,22 @@ public class ResultLimit extends BaseObject<String> {
         return highNormal;
     }
 
+    public void setLowReportingRange(double lowReportingRange) {
+        this.lowReportingRange = lowReportingRange;
+    }
+
+    public double getLowReportingRange() {
+        return lowReportingRange;
+    }
+
+    public void setHighReportingRange(double highReportingRange) {
+        this.highReportingRange = highReportingRange;
+    }
+
+    public double getHighReportingRange() {
+        return highReportingRange;
+    }
+
     public void setHighNormal(double highNormal) {
         this.highNormal = highNormal;
     }
@@ -117,5 +137,21 @@ public class ResultLimit extends BaseObject<String> {
 
     public void setAlwaysValidate(boolean alwaysValidate) {
         this.alwaysValidate = alwaysValidate;
+    }
+
+    public void setLowCritical(double lowCritical) {
+        this.lowCritical = lowCritical;
+    }
+
+    public double getLowCritical() {
+        return lowCritical;
+    }
+
+    public void setHighCritical(double highCritical) {
+        this.highCritical = highCritical;
+    }
+
+    public double getHighCritical() {
+        return highCritical;
     }
 }

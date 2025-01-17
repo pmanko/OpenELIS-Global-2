@@ -108,6 +108,12 @@ caption {
 	color: #336699;
 }
 
+.caption {
+	text-align: left;
+	font-size: 23px;
+	color: #336699;
+}
+
 .catalog-label {
 	font-size: 13px;
 	font-style: italic;
@@ -1479,5 +1485,6 @@ th.highlight-header-rev {
 .show-text-hover:hover .hidden-text {
 	display: inline;
 }
+
 
 

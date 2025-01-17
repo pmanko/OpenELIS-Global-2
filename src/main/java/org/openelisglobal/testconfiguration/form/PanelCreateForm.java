@@ -2,13 +2,11 @@ package org.openelisglobal.testconfiguration.form;
 
 import java.util.List;
 import java.util.Map;
-
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Pattern;
-
-import org.hibernate.validator.constraints.SafeHtml;
 import org.openelisglobal.common.form.BaseForm;
 import org.openelisglobal.common.validator.ValidationHelper;
+import org.openelisglobal.validation.annotations.SafeHtml;
 
 public class PanelCreateForm extends BaseForm {
     // for display
@@ -33,10 +31,10 @@ public class PanelCreateForm extends BaseForm {
     private String existingFrenchNames;
 
     @NotBlank
-    @SafeHtml(whitelistType = SafeHtml.WhiteListType.NONE)
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE)
     private String panelEnglishName;
 
-    @SafeHtml(whitelistType = SafeHtml.WhiteListType.NONE)
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE)
     private String panelFrenchName;
 
     @NotBlank

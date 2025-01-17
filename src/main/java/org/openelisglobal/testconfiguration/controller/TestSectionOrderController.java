@@ -2,10 +2,8 @@ package org.openelisglobal.testconfiguration.controller;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.hibernate.HibernateException;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -53,7 +51,8 @@ public class TestSectionOrderController extends BaseController {
     }
 
     private void setupDisplayItems(TestSectionOrderForm form) {
-        form.setTestSectionList(DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION));
+        form.setTestSectionList(
+                DisplayListService.getInstance().getList(DisplayListService.ListType.TEST_SECTION_ACTIVE));
     }
 
     @Override
@@ -61,7 +60,7 @@ public class TestSectionOrderController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "testSectionOrderDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/TestSectionOrder.do";
+            return "redirect:/TestSectionOrder";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "testSectionOrderDefinition";
         } else {
@@ -114,7 +113,7 @@ public class TestSectionOrderController extends BaseController {
             LogEvent.logDebug(e);
         }
 
-        DisplayListService.getInstance().refreshList(DisplayListService.ListType.TEST_SECTION);
+        DisplayListService.getInstance().refreshList(DisplayListService.ListType.TEST_SECTION_ACTIVE);
         DisplayListService.getInstance().refreshList(DisplayListService.ListType.TEST_SECTION_INACTIVE);
 
         return findForward(FWD_SUCCESS_INSERT, form);

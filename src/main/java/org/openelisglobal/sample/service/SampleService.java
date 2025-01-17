@@ -2,14 +2,15 @@ package org.openelisglobal.sample.service;
 
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.List;
-
 import org.openelisglobal.analysis.valueholder.Analysis;
 import org.openelisglobal.common.service.BaseObjectService;
 import org.openelisglobal.organization.valueholder.Organization;
 import org.openelisglobal.patient.valueholder.Patient;
 import org.openelisglobal.person.valueholder.Person;
 import org.openelisglobal.requester.valueholder.SampleRequester;
+import org.openelisglobal.sample.valueholder.OrderPriority;
 import org.openelisglobal.sample.valueholder.Sample;
 import org.openelisglobal.sample.valueholder.SampleAdditionalField;
 import org.openelisglobal.sample.valueholder.SampleAdditionalField.AdditionalFieldName;
@@ -108,4 +109,13 @@ public interface SampleService extends BaseObjectService<Sample, String> {
     List<Sample> getSamplesByAnalysisIds(List<String> analysisIds);
 
     List<Organization> getOrganizationRequesters(Sample sample);
+
+    boolean sampleContainsTestWithLoinc(String id, String loinc);
+
+    List<Sample> getSamplesForSiteBetweenOrderDates(String referringSiteId, LocalDate lowerDate, LocalDate upperDate);
+
+    List<Sample> getStudySamplesForSiteBetweenOrderDates(String referringSiteId, LocalDate lowerDate,
+            LocalDate upperDate);
+
+    List<Sample> getSamplesByPriority(OrderPriority priority);
 }

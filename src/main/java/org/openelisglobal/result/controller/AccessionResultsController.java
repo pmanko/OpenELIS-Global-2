@@ -3,10 +3,9 @@ package org.openelisglobal.result.controller;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
-
 import org.apache.commons.validator.GenericValidator;
+import org.openelisglobal.common.constants.Constants;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.services.DisplayListService;
 import org.openelisglobal.common.services.DisplayListService.ListType;
@@ -25,6 +24,7 @@ import org.openelisglobal.sample.service.SampleService;
 import org.openelisglobal.sample.valueholder.Sample;
 import org.openelisglobal.samplehuman.service.SampleHumanService;
 import org.openelisglobal.spring.util.SpringContext;
+import org.openelisglobal.systemuser.service.UserService;
 import org.openelisglobal.test.beanItems.TestResultItem;
 import org.openelisglobal.userrole.service.UserRoleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,9 +47,11 @@ public class AccessionResultsController extends BaseController {
     private SampleHumanService sampleHumanService;
     @Autowired
     private UserRoleService userRoleService;
+    @Autowired
+    private UserService userService;
 
     public AccessionResultsController(RoleService roleService) {
-        Role editRole = roleService.getRoleByName("Results modifier");
+        Role editRole = roleService.getRoleByName("Results");
         if (editRole != null) {
             RESULT_EDIT_ROLE_ID = editRole.getId();
         } else {
@@ -61,12 +63,12 @@ public class AccessionResultsController extends BaseController {
     public ModelAndView showAccessionResults(HttpServletRequest request)
             throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         AccessionResultsForm form = new AccessionResultsForm();
-
         request.getSession().setAttribute(SAVE_DISABLED, TRUE);
         form.setReferralReasons(DisplayListService.getInstance().getList(DisplayListService.ListType.REFERRAL_REASONS));
         form.setRejectReasons(DisplayListService.getInstance()
                 .getNumberedListWithLeadingBlank(DisplayListService.ListType.REJECTION_REASONS));
         form.setReferralOrganizations(DisplayListService.getInstance().getList(ListType.REFERRAL_ORGANIZATIONS));
+        form.setMethods(DisplayListService.getInstance().getList(ListType.METHODS));
 
         ResultsPaging paging = new ResultsPaging();
         String newPage = request.getParameter("page");
@@ -81,6 +83,7 @@ public class AccessionResultsController extends BaseController {
                 resultsUtility.setSysUser(getSysUserId(request));
                 // This is for Haiti_LNSP if it gets more complicated use the status set stuff
                 resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.Canceled);
+                resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.SampleRejected);
                 // resultsUtility.addExcludedAnalysisStatus(AnalysisStatus.Finalized);
                 resultsUtility.setLockCurrentResults(modifyResultsRoleBased() && userNotInRole(request));
                 validateAll(request, errors, form, accessionNumber);
@@ -103,6 +106,8 @@ public class AccessionResultsController extends BaseController {
                     resultsUtility.addIdentifingPatientInfo(patient, form);
 
                     List<TestResultItem> results = resultsUtility.getGroupedTestsForSample(sample, patient);
+                    List<TestResultItem> filteredResults = userService
+                            .filterResultsByLabUnitRoles(getSysUserId(request), results, Constants.ROLE_RESULTS);
 
                     if (resultsUtility.inventoryNeeded()) {
                         addInventory(form);
@@ -111,7 +116,7 @@ public class AccessionResultsController extends BaseController {
                         addEmptyInventoryList(form, accessionNumber);
                     }
 
-                    paging.setDatabaseResults(request, form, results);
+                    paging.setDatabaseResults(request, form, filteredResults);
                 } else {
                     setEmptyResults(form, accessionNumber);
                 }
@@ -181,8 +186,7 @@ public class AccessionResultsController extends BaseController {
         if (sample == null) {
             // ActionError error = new ActionError("sample.edit.sample.notFound",
             // accessionNumber, null, null);
-            errors.reject("sample.edit.sample.notFound", new String[] {},
-                    "sample.edit.sample.notFound");
+            errors.reject("sample.edit.sample.notFound", new String[] {}, "sample.edit.sample.notFound");
         }
 
         return errors;

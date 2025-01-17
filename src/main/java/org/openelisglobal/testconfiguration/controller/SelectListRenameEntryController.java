@@ -1,7 +1,6 @@
 package org.openelisglobal.testconfiguration.controller;
 
 import javax.servlet.http.HttpServletRequest;
-
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.services.DisplayListService;
 import org.openelisglobal.common.services.DisplayListService.ListType;
@@ -46,7 +45,7 @@ public class SelectListRenameEntryController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "resultSelectListRenameDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/SelectListRenameEntry.do";
+            return "redirect:/SelectListRenameEntry";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "resultSelectListRenameDefinition";
         } else {

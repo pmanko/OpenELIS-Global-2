@@ -4,10 +4,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
+import org.openelisglobal.common.constants.Constants;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.exception.LIMSRuntimeException;
 import org.openelisglobal.common.log.LogEvent;
@@ -107,7 +106,7 @@ public class PanelCreateController extends BaseController {
 
     @RequestMapping(value = "/PanelCreate", method = RequestMethod.POST)
     public ModelAndView postPanelCreate(HttpServletRequest request, @ModelAttribute("form") @Valid PanelCreateForm form,
-            BindingResult result)  {
+            BindingResult result) {
         if (result.hasErrors()) {
             saveErrors(result);
             return findForward(FWD_FAIL_INSERT, form);
@@ -124,8 +123,8 @@ public class PanelCreateController extends BaseController {
         SystemModule resultModule = createSystemModule("LogbookResults", identifyingName, systemUserId);
         SystemModule validationModule = createSystemModule("ResultValidation", identifyingName, systemUserId);
 
-        Role resultsEntryRole = roleService.getRoleByName("Results entry");
-        Role validationRole = roleService.getRoleByName("Validator");
+        Role resultsEntryRole = roleService.getRoleByName(Constants.ROLE_RESULTS);
+        Role validationRole = roleService.getRoleByName(Constants.ROLE_VALIDATION);
 
         RoleModule workplanResultModule = createRoleModule(systemUserId, workplanModule, resultsEntryRole);
         RoleModule resultResultModule = createRoleModule(systemUserId, resultModule, resultsEntryRole);
@@ -192,7 +191,7 @@ public class PanelCreateController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "panelCreateDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/PanelCreate.do";
+            return "redirect:/PanelCreate";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "panelCreateDefinition";
         } else {

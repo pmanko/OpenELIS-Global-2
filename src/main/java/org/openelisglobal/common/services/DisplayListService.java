@@ -1,50 +1,62 @@
 /**
- * The contents of this file are subject to the Mozilla Public License
- * Version 1.1 (the "License"); you may not use this file except in
- * compliance with the License. You may obtain a copy of the License at
- * http://www.mozilla.org/MPL/
+ * The contents of this file are subject to the Mozilla Public License Version 1.1 (the "License");
+ * you may not use this file except in compliance with the License. You may obtain a copy of the
+ * License at http://www.mozilla.org/MPL/
  *
- * Software distributed under the License is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
- * License for the specific language governing rights and limitations under
- * the License.
+ * <p>Software distributed under the License is distributed on an "AS IS" basis, WITHOUT WARRANTY OF
+ * ANY KIND, either express or implied. See the License for the specific language governing rights
+ * and limitations under the License.
  *
- * The Original Code is OpenELIS code.
+ * <p>The Original Code is OpenELIS code.
  *
- * Copyright (C) ITECH, University of Washington, Seattle WA.  All Rights Reserved.
- *
+ * <p>Copyright (C) ITECH, University of Washington, Seattle WA. All Rights Reserved.
  */
 package org.openelisglobal.common.services;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
-
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.common.util.ConfigurationProperties;
 import org.openelisglobal.common.util.ConfigurationProperties.Property;
 import org.openelisglobal.common.util.IdValuePair;
 import org.openelisglobal.common.util.LocaleChangeListener;
-import org.openelisglobal.common.util.SystemConfiguration;
 import org.openelisglobal.dictionary.service.DictionaryService;
 import org.openelisglobal.dictionary.valueholder.Dictionary;
 import org.openelisglobal.gender.service.GenderService;
 import org.openelisglobal.gender.valueholder.Gender;
+import org.openelisglobal.internationalization.GlobalLocaleResolver;
 import org.openelisglobal.internationalization.MessageUtil;
+import org.openelisglobal.method.service.MethodService;
+import org.openelisglobal.method.valueholder.Method;
 import org.openelisglobal.organization.service.OrganizationService;
+import org.openelisglobal.organization.util.OrganizationTypeList;
 import org.openelisglobal.organization.valueholder.Organization;
 import org.openelisglobal.panel.service.PanelService;
 import org.openelisglobal.panel.valueholder.Panel;
 import org.openelisglobal.panel.valueholder.PanelSortOrderComparator;
+import org.openelisglobal.program.service.ProgramService;
+import org.openelisglobal.program.valueholder.Program;
+import org.openelisglobal.program.valueholder.cytology.CytologyReport;
+import org.openelisglobal.program.valueholder.cytology.CytologySample;
+import org.openelisglobal.program.valueholder.cytology.CytologySpecimenAdequacy;
+import org.openelisglobal.program.valueholder.immunohistochemistry.ImmunohistochemistrySample;
+import org.openelisglobal.program.valueholder.immunohistochemistry.ImmunohistochemistrySampleReport;
+import org.openelisglobal.program.valueholder.pathology.PathologyRequest;
+import org.openelisglobal.program.valueholder.pathology.PathologySample;
+import org.openelisglobal.provider.service.ProviderService;
+import org.openelisglobal.provider.valueholder.Provider;
 import org.openelisglobal.qaevent.service.QaEventService;
 import org.openelisglobal.qaevent.valueholder.QaEvent;
 import org.openelisglobal.referral.service.ReferralReasonService;
 import org.openelisglobal.referral.valueholder.ReferralReason;
+import org.openelisglobal.sample.valueholder.OrderPriority;
 import org.openelisglobal.statusofsample.service.StatusOfSampleService;
 import org.openelisglobal.statusofsample.valueholder.StatusOfSample;
 import org.openelisglobal.test.service.TestSectionService;
@@ -61,6 +73,7 @@ import org.openelisglobal.unitofmeasure.service.UnitOfMeasureService;
 import org.openelisglobal.unitofmeasure.valueholder.UnitOfMeasure;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.LocaleResolver;
 
 @Service
 public class DisplayListService implements LocaleChangeListener {
@@ -71,12 +84,22 @@ public class DisplayListService implements LocaleChangeListener {
         HOURS, MINS, SAMPLE_TYPE_ACTIVE, SAMPLE_TYPE_INACTIVE, SAMPLE_TYPE, INITIAL_SAMPLE_CONDITION,
         SAMPLE_PATIENT_PAYMENT_OPTIONS, PATIENT_HEALTH_REGIONS, PATIENT_MARITAL_STATUS, PATIENT_NATIONALITY,
         PATIENT_EDUCATION, GENDERS, SAMPLE_PATIENT_REFERRING_CLINIC, SAMPLE_PATIENT_CLINIC_DEPARTMENT, QA_EVENTS,
-        TEST_SECTION, TEST_SECTION_INACTIVE,
-        TEST_SECTION_BY_NAME, HAITI_DEPARTMENTS, PATIENT_SEARCH_CRITERIA, PANELS, PANELS_ACTIVE, PANELS_INACTIVE,
-        ORDERABLE_TESTS, ALL_TESTS, REJECTION_REASONS, REFERRAL_REASONS, REFERRAL_ORGANIZATIONS, TEST_LOCATION_CODE,
-        PROGRAM, RESULT_TYPE_LOCALIZED, RESULT_TYPE_RAW, UNIT_OF_MEASURE, UNIT_OF_MEASURE_ACTIVE,
-        UNIT_OF_MEASURE_INACTIVE, DICTIONARY_TEST_RESULTS, LAB_COMPONENT, SEVERITY_CONSEQUENCES_LIST,
-        SEVERITY_RECURRENCE_LIST, ACTION_TYPE_LIST, LABORATORY_COMPONENT, SAMPLE_NATURE, ELECTRONIC_ORDER_STATUSES
+        TEST_SECTION_ACTIVE, TEST_SECTION_INACTIVE, TEST_SECTION_BY_NAME, HAITI_DEPARTMENTS, PATIENT_SEARCH_CRITERIA,
+        PANELS, PANELS_ACTIVE, PANELS_INACTIVE, ORDERABLE_TESTS, ALL_TESTS, REJECTION_REASONS, REFERRAL_REASONS,
+        REFERRAL_ORGANIZATIONS, TEST_LOCATION_CODE, DICTIONARY_PROGRAM, RESULT_TYPE_LOCALIZED, RESULT_TYPE_RAW,
+        UNIT_OF_MEASURE, UNIT_OF_MEASURE_ACTIVE, UNIT_OF_MEASURE_INACTIVE, DICTIONARY_TEST_RESULTS, LAB_COMPONENT,
+        SEVERITY_CONSEQUENCES_LIST, SEVERITY_RECURRENCE_LIST, ACTION_TYPE_LIST, LABORATORY_COMPONENT, SAMPLE_NATURE,
+        ELECTRONIC_ORDER_STATUSES, METHODS, METHODS_INACTIVE, METHOD_BY_NAME, PRACTITIONER_PERSONS, ORDER_PRIORITY,
+        PROGRAM, IMMUNOHISTOCHEMISTRY_STATUS, PATHOLOGY_STATUS, CYTOLOGY_SPECIMEN_ADEQUACY_SATISFACTION,
+        PATHOLOGY_TECHNIQUES, PATHOLOGIST_REQUESTS, PATHOLOGY_REQUEST_STATUS, PATHOLOGIST_CONCLUSIONS,
+        IMMUNOHISTOCHEMISTRY_REPORT_TYPES, IMMUNOHISTOCHEMISTRY_MARKERS_TESTS, CYTOLOGY_STATUS,
+        CYTOLOGY_SATISFACTORY_FOR_EVALUATION, CYTOLOGY_UN_SATISFACTORY_FOR_EVALUATION, CYTOLOGY_REPORT_TYPES,
+        CYTOLOGY_DIAGNOSIS_RESULT_EPITHELIAL_CELL_SQUAMOUS, CYTOLOGY_DIAGNOSIS_RESULT_EPITHELIAL_CELL_GLANDULAR,
+        CYTOLOGY_DIAGNOSIS_RESULT_NON_NEO_PLASTIC_CELLULAR, CYTOLOGY_DIAGNOSIS_RESULT_REACTIVE_CELLULAR,
+        CYTOLOGY_DIAGNOSIS_RESULT_ORGANISMS, CYTOLOGY_DIAGNOSIS_RESULT_OTHER, TB_ORDER_REASONS, TB_DIAGNOSTIC_REASONS,
+        TB_FOLLOWUP_REASONS, TB_ANALYSIS_METHODS, TB_SAMPLE_ASPECTS, TB_FOLLOWUP_LINE1, TB_FOLLOWUP_LINE2, ARV_ORG_LIST,
+        ACTIVE_ORG_LIST, IHC_BREAST_CANCER_REPORT_INTENSITY, IHC_BREAST_CANCER_REPORT_CERBB2_PATTERN,
+        IHC_BREAST_CANCER_REPORT_MOLE_SUBTYPE;
     }
 
     private static Map<ListType, List<IdValuePair>> typeToListMap;
@@ -99,6 +122,8 @@ public class DisplayListService implements LocaleChangeListener {
     @Autowired
     private TestSectionService testSectionService;
     @Autowired
+    private MethodService methodService;
+    @Autowired
     private UnitOfMeasureService unitOfMeasureService;
     @Autowired
     private DictionaryService dictionaryService;
@@ -106,14 +131,22 @@ public class DisplayListService implements LocaleChangeListener {
     private TypeOfTestResultService typeOfTestResultService;
     @Autowired
     private StatusOfSampleService statusOfSampleService;
+    @Autowired
+    private ProviderService providerService;
+    @Autowired
+    private ProgramService programService;
+    @Autowired
+    private LocaleResolver localeResolver;
 
     @PostConstruct
     private void setupGlobalVariables() {
         instance = this;
 
         refreshLists();
+        if (localeResolver instanceof GlobalLocaleResolver) {
+            ((GlobalLocaleResolver) localeResolver).addLocalChangeListener(this);
+        }
 
-        SystemConfiguration.getInstance().addLocalChangeListener(this);
     }
 
     public static DisplayListService getInstance() {
@@ -156,9 +189,12 @@ public class DisplayListService implements LocaleChangeListener {
                 createFromDictionaryCategoryLocalizedSort("Education Level Demographic Information"));
         typeToListMap.put(ListType.GENDERS, createGenderList());
         typeToListMap.put(ListType.QA_EVENTS, createSortedQAEvents());
-        typeToListMap.put(ListType.TEST_SECTION, createTestSectionList());
+        typeToListMap.put(ListType.TEST_SECTION_ACTIVE, createTestSectionActiveList());
         typeToListMap.put(ListType.TEST_SECTION_INACTIVE, createInactiveTestSection());
         typeToListMap.put(ListType.TEST_SECTION_BY_NAME, createTestSectionByNameList());
+        typeToListMap.put(ListType.METHODS, createMethodList());
+        typeToListMap.put(ListType.METHODS_INACTIVE, createInactiveMethod());
+        typeToListMap.put(ListType.METHOD_BY_NAME, createMethodByNameList());
         typeToListMap.put(ListType.SAMPLE_PATIENT_PAYMENT_OPTIONS,
                 createFromDictionaryCategoryLocalizedSort("patientPayment"));
         typeToListMap.put(ListType.PATIENT_SEARCH_CRITERIA, createPatientSearchCriteria());
@@ -172,8 +208,10 @@ public class DisplayListService implements LocaleChangeListener {
 
         typeToListMap.put(ListType.ORDERABLE_TESTS, createOrderableTestList());
         typeToListMap.put(ListType.ALL_TESTS, createTestList());
+        typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_MARKERS_TESTS, createImmunoHistoChemistryTestList());
         typeToListMap.put(ListType.TEST_LOCATION_CODE, createDictionaryListForCategory("testLocationCode"));
-        typeToListMap.put(ListType.PROGRAM, createDictionaryListForCategory("programs"));
+        typeToListMap.put(ListType.PROGRAM, createProgramList());
+        typeToListMap.put(ListType.DICTIONARY_PROGRAM, createDictionaryListForCategory("programs"));
         typeToListMap.put(ListType.RESULT_TYPE_LOCALIZED, createLocalizedResultTypeList());
         typeToListMap.put(ListType.UNIT_OF_MEASURE, createUOMList());
         typeToListMap.put(ListType.DICTIONARY_TEST_RESULTS, createDictionaryTestResults());
@@ -181,6 +219,84 @@ public class DisplayListService implements LocaleChangeListener {
         typeToListMap.put(ListType.SEVERITY_RECURRENCE_LIST, createRecurrenceList());
         typeToListMap.put(ListType.ACTION_TYPE_LIST, createActionTypeList());
         typeToListMap.put(ListType.LABORATORY_COMPONENT, createLaboratoryComponentList());
+        typeToListMap.put(ListType.ORDER_PRIORITY, createSamplePriorityList());
+        typeToListMap.put(ListType.PATHOLOGY_STATUS, createPathologyStatusList());
+        typeToListMap.put(ListType.CYTOLOGY_SPECIMEN_ADEQUACY_SATISFACTION,
+                createCytologySpecimenAdequacySatisfactionList());
+        typeToListMap.put(ListType.CYTOLOGY_STATUS, createCytologyStatusList());
+        typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_STATUS, createImmunohistochemistryStatusList());
+        typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_REPORT_TYPES, createImmunohistochemistryReportTypeList());
+        typeToListMap.put(ListType.CYTOLOGY_REPORT_TYPES, createCytologyReportTypeList());
+        typeToListMap.put(ListType.PATHOLOGY_REQUEST_STATUS, createPathologyRequestStatusList());
+        typeToListMap.put(ListType.PATHOLOGY_TECHNIQUES, createDictionaryListForCategory("pathology_techniques"));
+        typeToListMap.put(ListType.IHC_BREAST_CANCER_REPORT_INTENSITY,
+                createDictionaryListForCategory("ihc_breast_cancer_report_intensity"));
+        typeToListMap.put(ListType.IHC_BREAST_CANCER_REPORT_CERBB2_PATTERN,
+                createDictionaryListForCategory("ihc_breast_cancer_report_cerbb2_pattern"));
+        typeToListMap.put(ListType.IHC_BREAST_CANCER_REPORT_MOLE_SUBTYPE,
+                createDictionaryListForCategory("ihc_breast_cancer_report_molecular_subtype"));
+        typeToListMap.put(ListType.CYTOLOGY_SATISFACTORY_FOR_EVALUATION,
+                createDictionaryListForCategory("cytology_adequacy_satisfactory"));
+        typeToListMap.put(ListType.CYTOLOGY_UN_SATISFACTORY_FOR_EVALUATION,
+                createDictionaryListForCategory("cytology_adequacy_unsatisfactory"));
+        typeToListMap.put(ListType.PATHOLOGIST_REQUESTS, createDictionaryListForCategory("pathologist_requests"));
+        typeToListMap.put(ListType.PATHOLOGIST_CONCLUSIONS, createDictionaryListForCategory("pathologist_conclusions"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_EPITHELIAL_CELL_SQUAMOUS,
+                createDictionaryListForCategory("cytology_epithelial_cell_abnomalit_squamous"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_EPITHELIAL_CELL_GLANDULAR,
+                createDictionaryListForCategory("cytology_epithelial_cell_abnomalit_glandular"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_NON_NEO_PLASTIC_CELLULAR,
+                createDictionaryListForCategory("cytology_non-neoplastic_cellular_variations"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_REACTIVE_CELLULAR,
+                createDictionaryListForCategory("cytology_reactive_cellular_changes"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_ORGANISMS,
+                createDictionaryListForCategory("cytology_diagnosis_organisms"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_OTHER,
+                createDictionaryListForCategory("cytology_diagnosis_other"));
+        typeToListMap.put(ListType.TB_ORDER_REASONS, createDictionaryListForCategory("TB Order Reasons"));
+        typeToListMap.put(ListType.TB_DIAGNOSTIC_REASONS, createDictionaryListForCategory("TB Diagnostic Reasons"));
+        typeToListMap.put(ListType.TB_FOLLOWUP_REASONS, createDictionaryListForCategory("TB Followup Reasons"));
+        typeToListMap.put(ListType.TB_ANALYSIS_METHODS, createDictionaryListForCategory("TB Analysis Methods"));
+        typeToListMap.put(ListType.TB_SAMPLE_ASPECTS, createDictionaryListForCategory("TB Sample Aspects"));
+        typeToListMap.put(ListType.TB_FOLLOWUP_LINE1, createTBFollowupLine1List());
+        typeToListMap.put(ListType.TB_FOLLOWUP_LINE2, createTBFollowupLine2List());
+        typeToListMap.put(ListType.ARV_ORG_LIST, createArvOrgList());
+        typeToListMap.put(ListType.ACTIVE_ORG_LIST, createActiveOrganizationsList());
+    }
+
+    private List<IdValuePair> createPathologyStatusList() {
+        return Arrays.asList(PathologySample.PathologyStatus.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
+    }
+
+    private List<IdValuePair> createCytologyStatusList() {
+        return Arrays.asList(CytologySample.CytologyStatus.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
+    }
+
+    private List<IdValuePair> createImmunohistochemistryStatusList() {
+        return Arrays.asList(ImmunohistochemistrySample.ImmunohistochemistryStatus.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
+    }
+
+    private List<IdValuePair> createCytologySpecimenAdequacySatisfactionList() {
+        return Arrays.asList(CytologySpecimenAdequacy.SpecimenAdequancySatisfaction.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
+    }
+
+    private List<IdValuePair> createImmunohistochemistryReportTypeList() {
+        return Arrays.asList(ImmunohistochemistrySampleReport.ImmunoHistologyReportType.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
+    }
+
+    private List<IdValuePair> createCytologyReportTypeList() {
+        return Arrays.asList(CytologyReport.CytologyReportType.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
+    }
+
+    private List<IdValuePair> createPathologyRequestStatusList() {
+        return Arrays.asList(PathologyRequest.RequestStatus.values()).stream()
+                .map(e -> new IdValuePair(e.name(), e.getDisplay())).collect(Collectors.toList());
     }
 
     public List<IdValuePair> getList(ListType listType) {
@@ -224,6 +340,15 @@ public class DisplayListService implements LocaleChangeListener {
             list.add(new IdValuePair(uom.getId(), uom.getLocalizedName()));
         }
 
+        return list;
+    }
+
+    private List<IdValuePair> createProgramList() {
+        List<IdValuePair> list = new ArrayList<>();
+        List<Program> programList = programService.getAll();
+        for (Program program : programList) {
+            list.add(new IdValuePair(program.getId(), program.getProgramName()));
+        }
         return list;
     }
 
@@ -305,6 +430,14 @@ public class DisplayListService implements LocaleChangeListener {
 
     public synchronized void refreshLists() {
         typeToListMap = new HashMap<>();
+        typeToListMap.put(ListType.CYTOLOGY_STATUS, createCytologyStatusList());
+        typeToListMap.put(ListType.PATHOLOGY_STATUS, createPathologyStatusList());
+        typeToListMap.put(ListType.CYTOLOGY_SPECIMEN_ADEQUACY_SATISFACTION,
+                createCytologySpecimenAdequacySatisfactionList());
+        typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_STATUS, createImmunohistochemistryStatusList());
+        typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_REPORT_TYPES, createImmunohistochemistryReportTypeList());
+        typeToListMap.put(ListType.CYTOLOGY_REPORT_TYPES, createCytologyReportTypeList());
+        typeToListMap.put(ListType.PATHOLOGY_REQUEST_STATUS, createPathologyRequestStatusList());
         typeToListMap.put(ListType.HOURS, createHourList());
         typeToListMap.put(ListType.MINS, createMinList());
         typeToListMap.put(ListType.SAMPLE_TYPE, createTypeOfSampleList());
@@ -323,7 +456,10 @@ public class DisplayListService implements LocaleChangeListener {
         typeToListMap.put(ListType.GENDERS, createGenderList());
         typeToListMap.put(ListType.SAMPLE_PATIENT_REFERRING_CLINIC, createReferringClinicList());
         typeToListMap.put(ListType.QA_EVENTS, createSortedQAEvents());
-        typeToListMap.put(ListType.TEST_SECTION, createTestSectionList());
+        typeToListMap.put(ListType.TEST_SECTION_ACTIVE, createTestSectionActiveList());
+        typeToListMap.put(ListType.METHODS, createMethodList());
+        typeToListMap.put(ListType.METHODS_INACTIVE, createInactiveMethod());
+        typeToListMap.put(ListType.METHOD_BY_NAME, createMethodByNameList());
         typeToListMap.put(ListType.TEST_SECTION_INACTIVE, createInactiveTestSection());
         typeToListMap.put(ListType.TEST_SECTION_BY_NAME, createTestSectionByNameList());
         typeToListMap.put(ListType.HAITI_DEPARTMENTS, createAddressDepartmentList());
@@ -335,11 +471,13 @@ public class DisplayListService implements LocaleChangeListener {
         typeToListMap.put(ListType.PANELS_INACTIVE, createPanelList(true));
         typeToListMap.put(ListType.ORDERABLE_TESTS, createOrderableTestList());
         typeToListMap.put(ListType.ALL_TESTS, createTestList());
+        typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_MARKERS_TESTS, createImmunoHistoChemistryTestList());
         typeToListMap.put(ListType.REJECTION_REASONS, createDictionaryListForCategory("resultRejectionReasons"));
         typeToListMap.put(ListType.REFERRAL_REASONS, createReferralReasonList());
         typeToListMap.put(ListType.REFERRAL_ORGANIZATIONS, createReferralOrganizationList());
         typeToListMap.put(ListType.TEST_LOCATION_CODE, createDictionaryListForCategory("testLocationCode"));
-        typeToListMap.put(ListType.PROGRAM, createDictionaryListForCategory("programs"));
+        typeToListMap.put(ListType.PROGRAM, createProgramList());
+        typeToListMap.put(ListType.DICTIONARY_PROGRAM, createDictionaryListForCategory("programs"));
         typeToListMap.put(ListType.RESULT_TYPE_LOCALIZED, createLocalizedResultTypeList());
         typeToListMap.put(ListType.RESULT_TYPE_RAW, createRawResultTypeList());
         typeToListMap.put(ListType.UNIT_OF_MEASURE, createUOMList());
@@ -351,12 +489,55 @@ public class DisplayListService implements LocaleChangeListener {
         typeToListMap.put(ListType.ACTION_TYPE_LIST, createActionTypeList());
         typeToListMap.put(ListType.LABORATORY_COMPONENT, createLaboratoryComponentList());
         typeToListMap.put(ListType.ELECTRONIC_ORDER_STATUSES, createElectronicOrderStatusList());
-
+        typeToListMap.put(ListType.PRACTITIONER_PERSONS, createActivePractitionerPersonsList());
+        typeToListMap.put(ListType.ORDER_PRIORITY, createSamplePriorityList());
+        typeToListMap.put(ListType.IHC_BREAST_CANCER_REPORT_INTENSITY,
+                createDictionaryListForCategory("ihc_breast_cancer_report_intensity"));
+        typeToListMap.put(ListType.IHC_BREAST_CANCER_REPORT_CERBB2_PATTERN,
+                createDictionaryListForCategory("ihc_breast_cancer_report_cerbb2_pattern"));
+        typeToListMap.put(ListType.IHC_BREAST_CANCER_REPORT_MOLE_SUBTYPE,
+                createDictionaryListForCategory("ihc_breast_cancer_report_molecular_subtype"));
+        typeToListMap.put(ListType.PATHOLOGY_TECHNIQUES, createDictionaryListForCategory("pathology_techniques"));
+        typeToListMap.put(ListType.PATHOLOGIST_REQUESTS, createDictionaryListForCategory("pathologist_requests"));
+        typeToListMap.put(ListType.PATHOLOGIST_CONCLUSIONS, createDictionaryListForCategory("pathologist_conclusions"));
+        typeToListMap.put(ListType.CYTOLOGY_SATISFACTORY_FOR_EVALUATION,
+                createDictionaryListForCategory("cytology_adequacy_satisfactory"));
+        typeToListMap.put(ListType.CYTOLOGY_UN_SATISFACTORY_FOR_EVALUATION,
+                createDictionaryListForCategory("cytology_adequacy_unsatisfactory"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_EPITHELIAL_CELL_SQUAMOUS,
+                createDictionaryListForCategory("cytology_epithelial_cell_abnomalit_squamous"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_EPITHELIAL_CELL_GLANDULAR,
+                createDictionaryListForCategory("cytology_epithelial_cell_abnomalit_glandular"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_NON_NEO_PLASTIC_CELLULAR,
+                createDictionaryListForCategory("cytology_non-neoplastic_cellular_variations"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_REACTIVE_CELLULAR,
+                createDictionaryListForCategory("cytology_reactive_cellular_changes"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_ORGANISMS,
+                createDictionaryListForCategory("cytology_diagnosis_organisms"));
+        typeToListMap.put(ListType.CYTOLOGY_DIAGNOSIS_RESULT_OTHER,
+                createDictionaryListForCategory("cytology_diagnosis_other"));
+        typeToListMap.put(ListType.TB_ORDER_REASONS, createDictionaryListForCategory("TB Order Reasons"));
+        typeToListMap.put(ListType.TB_DIAGNOSTIC_REASONS, createDictionaryListForCategory("TB Diagnostic Reasons"));
+        typeToListMap.put(ListType.TB_FOLLOWUP_REASONS, createDictionaryListForCategory("TB Followup Reasons"));
+        typeToListMap.put(ListType.TB_ANALYSIS_METHODS, createDictionaryListForCategory("TB Analysis Methods"));
+        typeToListMap.put(ListType.TB_SAMPLE_ASPECTS, createDictionaryListForCategory("TB Sample Aspects"));
+        typeToListMap.put(ListType.TB_FOLLOWUP_LINE1, createTBFollowupLine1List());
+        typeToListMap.put(ListType.TB_FOLLOWUP_LINE2, createTBFollowupLine2List());
+        typeToListMap.put(ListType.ARV_ORG_LIST, createArvOrgList());
+        typeToListMap.put(ListType.ACTIVE_ORG_LIST, createActiveOrganizationsList());
     }
 
     public void refreshList(ListType listType) {
 
         switch (listType) {
+        case ORDER_PRIORITY: {
+            typeToListMap.put(ListType.ORDER_PRIORITY, createSamplePriorityList());
+            break;
+        }
+        case PRACTITIONER_PERSONS: {
+            typeToListMap.put(ListType.PRACTITIONER_PERSONS, createActivePractitionerPersonsList());
+            break;
+        }
         case SAMPLE_PATIENT_REFERRING_CLINIC: {
             typeToListMap.put(ListType.SAMPLE_PATIENT_REFERRING_CLINIC, createReferringClinicList());
             break;
@@ -364,6 +545,11 @@ public class DisplayListService implements LocaleChangeListener {
         case ALL_TESTS: {
             testService.refreshTestNames();
             typeToListMap.put(ListType.ALL_TESTS, createTestList());
+            break;
+        }
+        case IMMUNOHISTOCHEMISTRY_MARKERS_TESTS: {
+            testService.refreshTestNames();
+            typeToListMap.put(ListType.IMMUNOHISTOCHEMISTRY_MARKERS_TESTS, createImmunoHistoChemistryTestList());
             break;
         }
         case ORDERABLE_TESTS: {
@@ -383,9 +569,19 @@ public class DisplayListService implements LocaleChangeListener {
             typeToListMap.put(ListType.SAMPLE_TYPE_INACTIVE, createSampleTypeList(true));
             break;
         }
-        case TEST_SECTION: {
+        case TEST_SECTION_ACTIVE: {
             testSectionService.refreshNames();
-            typeToListMap.put(ListType.TEST_SECTION, createTestSectionList());
+            typeToListMap.put(ListType.TEST_SECTION_ACTIVE, createTestSectionActiveList());
+            break;
+        }
+        case METHODS: {
+            methodService.refreshNames();
+            typeToListMap.put(ListType.METHODS, createMethodList());
+            break;
+        }
+        case METHODS_INACTIVE: {
+            methodService.refreshNames();
+            typeToListMap.put(ListType.METHODS_INACTIVE, createInactiveMethod());
             break;
         }
         case TEST_SECTION_INACTIVE: {
@@ -418,10 +614,35 @@ public class DisplayListService implements LocaleChangeListener {
             typeToListMap.put(ListType.PATIENT_HEALTH_REGIONS, createPatientHealthRegions());
             break;
         }
+        case PROGRAM: {
+            typeToListMap.put(ListType.PROGRAM, createProgramList());
+        }
         case DICTIONARY_TEST_RESULTS: {
             typeToListMap.put(ListType.DICTIONARY_TEST_RESULTS, createDictionaryTestResults());
         }
+        case ARV_ORG_LIST: {
+            typeToListMap.put(ListType.ARV_ORG_LIST, createArvOrgList());
         }
+        case ACTIVE_ORG_LIST: {
+            typeToListMap.put(ListType.ACTIVE_ORG_LIST, createActiveOrganizationsList());
+        }
+        }
+    }
+
+    private List<IdValuePair> createActivePractitionerPersonsList() {
+        List<IdValuePair> providerDisplayList = new ArrayList<>();
+
+        List<Provider> providerList = providerService.getAllActiveProviders();
+        providerList.sort((e, f) -> {
+            return e.getPerson().getLastName().compareTo(f.getPerson().getLastName());
+        });
+
+        for (Provider provider : providerList) {
+            providerDisplayList.add(new IdValuePair(provider.getPerson().getId(),
+                    provider.getPerson().getLastName() + ", " + provider.getPerson().getFirstName()));
+        }
+
+        return providerDisplayList;
     }
 
     private List<IdValuePair> createReferringClinicList() {
@@ -429,6 +650,38 @@ public class DisplayListService implements LocaleChangeListener {
 
         List<Organization> orgList = organizationService.getOrganizationsByTypeName("shortName",
                 RequesterService.REFERRAL_ORG_TYPE);
+        orgList.sort((e, f) -> {
+            return e.getOrganizationName().compareTo(f.getOrganizationName());
+        });
+
+        for (Organization organization : orgList) {
+            if (GenericValidator.isBlankOrNull(organization.getShortName())) {
+                requesterList.add(new IdValuePair(organization.getId(), organization.getOrganizationName()));
+            } else {
+                requesterList.add(new IdValuePair(organization.getId(),
+                        organization.getShortName() + " - " + organization.getOrganizationName()));
+            }
+        }
+
+        return requesterList;
+    }
+
+    private List<IdValuePair> createActiveOrganizationsList() {
+        List<IdValuePair> activeOrgList = new ArrayList<>();
+
+        List<Organization> orgList = organizationService.getActiveOrganizations();
+
+        for (Organization organization : orgList) {
+
+            activeOrgList.add(new IdValuePair(organization.getId(), organization.getOrganizationName()));
+        }
+        return activeOrgList;
+    }
+
+    private List<IdValuePair> createArvOrgList() {
+        List<IdValuePair> requesterList = new ArrayList<>();
+
+        List<Organization> orgList = OrganizationTypeList.ARV_ORGS.getList();
         orgList.sort((e, f) -> {
             return e.getOrganizationName().compareTo(f.getOrganizationName());
         });
@@ -527,6 +780,27 @@ public class DisplayListService implements LocaleChangeListener {
             });
         }
 
+        return tests;
+    }
+
+    private List<IdValuePair> createImmunoHistoChemistryTestList() {
+        ArrayList<IdValuePair> tests = new ArrayList<>();
+        String id = testSectionService.getTestSectionByName("Immunohistochemistry").getId();
+        if (id == null) {
+            return tests;
+        }
+        List<Test> testList = testService.getTestsByTestSectionId(id);
+        for (Test test : testList) {
+            tests.add(new IdValuePair(test.getId(), TestServiceImpl.getLocalizedTestNameWithType(test)));
+
+            Collections.sort(tests, new Comparator<IdValuePair>() {
+
+                @Override
+                public int compare(IdValuePair o1, IdValuePair o2) {
+                    return o1.getValue().compareTo(o2.getValue());
+                }
+            });
+        }
         return tests;
     }
 
@@ -632,7 +906,7 @@ public class DisplayListService implements LocaleChangeListener {
         return qaEvents;
     }
 
-    private List<IdValuePair> createTestSectionList() {
+    private List<IdValuePair> createTestSectionActiveList() {
         List<IdValuePair> testSectionsPairs = new ArrayList<>();
         List<TestSection> testSections = testSectionService.getAllActiveTestSections();
 
@@ -643,9 +917,21 @@ public class DisplayListService implements LocaleChangeListener {
         return testSectionsPairs;
     }
 
+    private List<IdValuePair> createMethodList() {
+        List<IdValuePair> methodPairs = new ArrayList<>();
+        List<Method> methods = methodService.getAll();
+
+        for (Method method : methods) {
+            methodPairs.add(new IdValuePair(method.getId(), method.getLocalization().getLocalizedValue()));
+        }
+
+        return methodPairs;
+    }
+
     private List<IdValuePair> createUnitOfMeasureList() {
         List<IdValuePair> unitOfMeasuresPairs = new ArrayList<>();
-//		List<UnitOfMeasure> unitOfMeasures = unitOfMeasureService.getAllActiveUnitOfMeasures();
+        // List<UnitOfMeasure> unitOfMeasures =
+        // unitOfMeasureService.getAllActiveUnitOfMeasures();
         List<UnitOfMeasure> unitOfMeasures = unitOfMeasureService.getAll();
 
         for (UnitOfMeasure unitOfMeasure : unitOfMeasures) {
@@ -675,6 +961,17 @@ public class DisplayListService implements LocaleChangeListener {
         }
 
         return testSectionsPairs;
+    }
+
+    private List<IdValuePair> createInactiveMethod() {
+        List<IdValuePair> methodPairs = new ArrayList<>();
+        List<Method> methods = methodService.getAllInActiveMethods();
+
+        for (Method method : methods) {
+            methodPairs.add(new IdValuePair(method.getId(), method.getLocalization().getLocalizedValue()));
+        }
+
+        return methodPairs;
     }
 
     private List<IdValuePair> createTestSectionByNameList() {
@@ -740,6 +1037,23 @@ public class DisplayListService implements LocaleChangeListener {
         return recurrenceList;
     }
 
+    private List<IdValuePair> createTBFollowupLine1List() {
+        List<IdValuePair> tbFollowupLine1List = new ArrayList<>();
+        tbFollowupLine1List.add(new IdValuePair("M2", MessageUtil.getMessage("dictionary.tb.order.followup") + " M2"));
+        tbFollowupLine1List.add(new IdValuePair("M5", MessageUtil.getMessage("dictionary.tb.order.followup") + " M5"));
+        tbFollowupLine1List.add(new IdValuePair("M6", MessageUtil.getMessage("dictionary.tb.order.followup") + " M6"));
+        return tbFollowupLine1List;
+    }
+
+    private List<IdValuePair> createTBFollowupLine2List() {
+        List<IdValuePair> tbFollowupLine2List = new ArrayList<>();
+        for (int i = 0; i <= 24; i++) {
+            tbFollowupLine2List
+                    .add(new IdValuePair("M" + i, MessageUtil.getMessage("dictionary.tb.order.followup") + " M" + i));
+        }
+        return tbFollowupLine2List;
+    }
+
     private List<IdValuePair> createActionTypeList() {
         List<IdValuePair> recurrenceList = new ArrayList<>();
 
@@ -775,4 +1089,23 @@ public class DisplayListService implements LocaleChangeListener {
         return recurrenceList;
     }
 
+    private List<IdValuePair> createMethodByNameList() {
+        List<IdValuePair> methodsPairs = new ArrayList<>();
+        List<Method> methods = methodService.getAllActiveMethods();
+        for (Method method : methods) {
+            methodsPairs.add(new IdValuePair(method.getId(), method.getMethodName()));
+        }
+        return methodsPairs;
+    }
+
+    private List<IdValuePair> createSamplePriorityList() {
+        List<IdValuePair> priorities = new ArrayList<>();
+        priorities.add(new IdValuePair(OrderPriority.ROUTINE.name(), MessageUtil.getMessage("label.priority.routine")));
+        priorities.add(new IdValuePair(OrderPriority.ASAP.name(), MessageUtil.getMessage("label.priority.asap")));
+        priorities.add(new IdValuePair(OrderPriority.STAT.name(), MessageUtil.getMessage("label.priority.stat")));
+        priorities.add(new IdValuePair(OrderPriority.TIMED.name(), MessageUtil.getMessage("label.priority.timed")));
+        priorities.add(
+                new IdValuePair(OrderPriority.FUTURE_STAT.name(), MessageUtil.getMessage("label.priority.futureStat")));
+        return priorities;
+    }
 }

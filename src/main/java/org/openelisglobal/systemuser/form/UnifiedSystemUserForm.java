@@ -1,12 +1,17 @@
 package org.openelisglobal.systemuser.form;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
+import java.util.Set;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Pattern;
-
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.openelisglobal.common.form.BaseForm;
+import org.openelisglobal.common.util.IdValuePair;
 import org.openelisglobal.common.util.validator.CustomDateValidator.DateRelation;
 import org.openelisglobal.common.validator.ValidationHelper;
 import org.openelisglobal.role.action.bean.DisplayRole;
@@ -40,7 +45,28 @@ public class UnifiedSystemUserForm extends BaseForm {
     private String userLastName = "";
 
     // for display
-    private List<DisplayRole> roles;
+    private List<DisplayRole> globalRoles;
+
+    // for display
+    private List<DisplayRole> labUnitRoles;
+
+    // for display
+    private List<IdValuePair> testSections;
+
+    /**
+     * There are multiple fields in the ui-form mapped to this field, because the
+     * ui-form can dynamically create more fields mapped to this same field(path),
+     * this field is only used to get values from the form as a single String with
+     * comma ,separated values ie "value1 ,value2"
+     */
+    private String testSectionId;
+
+    /**
+     * There are multiple fields in the ui-form mapped to this field, because the
+     * ui-form can dynamically create more fields mapped to this same field(path),
+     * this field is only used to get values from the form as a List of Strings
+     */
+    private List<String> selectedLabUnitRoles;
 
     private List<@Pattern(regexp = ValidationHelper.ID_REGEX) String> selectedRoles;
 
@@ -65,6 +91,25 @@ public class UnifiedSystemUserForm extends BaseForm {
     private String timeout;
 
     private Timestamp systemUserLastupdated;
+
+    /**
+     * This field passes the user Lab Unit Roles data to the ui-form in form of a
+     * json object , in order to dynamically render sets of Lab Unit Roles with data
+     * ,with fields that are mapped to the same path ie testSectionId and
+     * selectedLabUnitRoles
+     **/
+    @JsonIgnore
+    private JSONObject userLabRoleData;
+
+    // for display
+    private JSONArray systemUsers;
+
+    @Pattern(regexp = ValidationHelper.ID_REGEX)
+    private String systemUserIdToCopy = "";
+
+    @NotBlank
+    @Pattern(regexp = ValidationHelper.YES_NO_REGEX)
+    private String allowCopyUserRoles = "N";
 
     public UnifiedSystemUserForm() {
         setFormName("unifiedSystemUserForm");
@@ -126,12 +171,20 @@ public class UnifiedSystemUserForm extends BaseForm {
         this.userLastName = userLastName;
     }
 
-    public List<DisplayRole> getRoles() {
-        return roles;
+    public List<DisplayRole> getGlobalRoles() {
+        return globalRoles;
     }
 
-    public void setRoles(List<DisplayRole> roles) {
-        this.roles = roles;
+    public void setGlobalRoles(List<DisplayRole> globalRoles) {
+        this.globalRoles = globalRoles;
+    }
+
+    public List<DisplayRole> getLabUnitRoles() {
+        return labUnitRoles;
+    }
+
+    public void setLabUnitRoles(List<DisplayRole> labUnitRoles) {
+        this.labUnitRoles = labUnitRoles;
     }
 
     public List<String> getSelectedRoles() {
@@ -188,5 +241,73 @@ public class UnifiedSystemUserForm extends BaseForm {
 
     public void setSystemUserLastupdated(Timestamp systemUserLastupdated) {
         this.systemUserLastupdated = systemUserLastupdated;
+    }
+
+    public List<IdValuePair> getTestSections() {
+        return testSections;
+    }
+
+    public void setTestSections(List<IdValuePair> testSections) {
+        this.testSections = testSections;
+    }
+
+    public String getTestSectionId() {
+        return testSectionId;
+    }
+
+    public void setTestSectionId(String testSectionId) {
+        this.testSectionId = testSectionId;
+    }
+
+    public List<String> getSelectedLabUnitRoles() {
+        return selectedLabUnitRoles;
+    }
+
+    public void setSelectedLabUnitRoles(List<String> selectedLabUnitRoles) {
+        this.selectedLabUnitRoles = selectedLabUnitRoles;
+    }
+
+    @JsonIgnore
+    public JSONObject getUserLabRoleData() {
+        return userLabRoleData;
+    }
+
+    public void setUserLabRoleData(JSONObject userLabRoleData) {
+        this.userLabRoleData = userLabRoleData;
+    }
+
+    @JsonIgnore
+    public JSONArray getSystemUsers() {
+        return systemUsers;
+    }
+
+    public void setSystemUsers(JSONArray systemUsers) {
+        this.systemUsers = systemUsers;
+    }
+
+    public String getSystemUserIdToCopy() {
+        return systemUserIdToCopy;
+    }
+
+    public void setSystemUserIdToCopy(String systemUserIdToCopy) {
+        this.systemUserIdToCopy = systemUserIdToCopy;
+    }
+
+    public String getAllowCopyUserRoles() {
+        return allowCopyUserRoles;
+    }
+
+    public void setAllowCopyUserRoles(String allowCopyUserRoles) {
+        this.allowCopyUserRoles = allowCopyUserRoles;
+    }
+
+    private Map<String, Set<String>> selectedTestSectionLabUnits = new HashMap<>();
+
+    public Map<String, Set<String>> getSelectedTestSectionLabUnits() {
+        return selectedTestSectionLabUnits;
+    }
+
+    public void setSelectedTestSectionLabUnits(Map<String, Set<String>> selectedTestSectionLabUnits) {
+        this.selectedTestSectionLabUnits = selectedTestSectionLabUnits;
     }
 }

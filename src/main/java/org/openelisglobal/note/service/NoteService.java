@@ -2,7 +2,6 @@ package org.openelisglobal.note.service;
 
 import java.sql.Date;
 import java.util.List;
-
 import org.openelisglobal.common.service.BaseObjectService;
 import org.openelisglobal.common.util.StringUtil.EncodeContext;
 import org.openelisglobal.note.service.NoteServiceImpl.NoteType;
@@ -44,4 +43,7 @@ public interface NoteService extends BaseObjectService<Note, String> {
 
     List<Note> getNotes(NoteObject noteObject);
 
+    boolean duplicateNoteExists(Note note);
+
+    List<Note> getTestNotesInDateRangeByType(Date lowDate, Date highDate, NoteType noteType);
 }

@@ -1,14 +1,13 @@
 package org.openelisglobal.dictionary.form;
 
 import java.util.Collection;
-
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Pattern;
-
-import org.hibernate.validator.constraints.SafeHtml;
+import org.hibernate.validator.constraints.Length;
 import org.openelisglobal.common.form.BaseForm;
 import org.openelisglobal.common.validator.ValidationHelper;
 import org.openelisglobal.dictionarycategory.valueholder.DictionaryCategory;
+import org.openelisglobal.validation.annotations.SafeHtml;
 
 public class DictionaryForm extends BaseForm {
 
@@ -30,10 +29,12 @@ public class DictionaryForm extends BaseForm {
     private String isActive = "";
 
     @NotBlank
-    @SafeHtml(whitelistType = SafeHtml.WhiteListType.NONE)
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE)
     private String dictEntry = "";
 
-    @SafeHtml(whitelistType = SafeHtml.WhiteListType.NONE)
+    @NotBlank
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE)
+    @Length(max = 10)
     private String localAbbreviation = "";
 
     // in validator
@@ -106,5 +107,4 @@ public class DictionaryForm extends BaseForm {
     public void setDirtyFormFields(String dirtyFormFields) {
         this.dirtyFormFields = dirtyFormFields;
     }
-
 }

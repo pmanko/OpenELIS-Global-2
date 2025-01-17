@@ -26,6 +26,48 @@ function getNotificationsForTests( testIds, success, failure){
 
 //sensitive data is being transmitted, therefore a token check should be done even on GET. 
 //Otherwise this should be moved to a POST request and rely on regular csrf functionality
+function getProviderInfo( providerId, success, failure){
+	if( !failure ){	failure = defaultFailure;}
+	if (!providerId || providerId === "") {
+		return;
+	}
+
+	new Ajax.Request('Provider/' + providerId,
+			{
+				method : 'get', 
+			    //indicator: 'throbbing',
+				requestHeaders : {
+					"X-CSRF-Token" : getCsrfToken()
+				},
+				onSuccess : success,
+				onFailure : failure
+			});
+
+}
+
+//sensitive data is being transmitted, therefore a token check should be done even on GET. 
+//Otherwise this should be moved to a POST request and rely on regular csrf functionality
+function getProviderInfoByPersonId( personId, success, failure){
+	if( !failure ){	failure = defaultFailure;}
+	if (!personId || personId === "") {
+		return;
+	}
+
+	new Ajax.Request('Provider/Person/' + personId,
+			{
+				method : 'get', 
+			    //indicator: 'throbbing',
+				requestHeaders : {
+					"X-CSRF-Token" : getCsrfToken()
+				},
+				onSuccess : success,
+				onFailure : failure
+			});
+
+}
+
+//sensitive data is being transmitted, therefore a token check should be done even on GET. 
+//Otherwise this should be moved to a POST request and rely on regular csrf functionality
 function getLabOrder( orderNumber, success, failure){
 	if( !failure ){	failure = defaultFailure;}
 	
@@ -66,13 +108,13 @@ function getSampleForLabOrderOrPatient( orderNumber, patientPK, success, failure
 
 //sensitive data is being transmitted, therefore a token check should be done even on GET. 
 //Otherwise this should be moved to a POST request and rely on regular csrf functionality
-function getSampleForLabOrderOrPatientWithTest( orderNumber, patientPK, testId, unvalidatedTestOnly, success, failure, additionalSuccessParams){
+function getSampleForLabOrderOrPatientWithTestLOINC( orderNumber, patientPK, loinc, unvalidatedTestOnly, success, failure, additionalSuccessParams){
 	if( !failure ){	failure = defaultFailure;}
 	
 	new Ajax.Request('ajaxQueryXML',
 			{
 				method : 'get', 
-				parameters : "provider=SampleSearchPopulateProvider&unvalidatedTestOnly=" + unvalidatedTestOnly + "&testId=" + testId + "&patientKey=" + patientPK + "&accessionNo=" + orderNumber ,
+				parameters : "provider=SampleSearchPopulateProvider&unvalidatedTestOnly=" + unvalidatedTestOnly + "&loinc=" + loinc + "&patientKey=" + patientPK + "&accessionNo=" + orderNumber ,
 			    //indicator: 'throbbing',
 				requestHeaders : {
 					"X-CSRF-Token" : getCsrfToken()
@@ -147,7 +189,7 @@ function getTestResultLimits(testId, success, failure){
 //sensitive data is being transmitted, therefore a token check should be done even on GET. 
 //Otherwise this should be moved to a POST request and rely on regular csrf functionality
 function getEntityNames( entitiyId,entityName ,success, failure){
-    var permitted = ['panel','sampleType','testSection','unitOfMeasure'];
+    var permitted = ['panel','sampleType','testSection','unitOfMeasure','method'];
 
     if( permitted.indexOf(entityName) == -1){
         alert( "\"" + entityName + "\" has not been implemented for getEntityNames");
@@ -236,26 +278,6 @@ function getTestsForSampleType(sampleTypeId, success, failure) {
 	{// options
 		method : 'get', // http method
 		parameters : "provider=SampleEntryTestsForTypeProvider" + request,
-		// indicator: 'throbbing'
-		requestHeaders : {
-			"X-CSRF-Token" : getCsrfToken()
-		},
-		onSuccess : success,
-		onFailure : failure
-	});
-}
-
-//sensitive data is being transmitted, therefore a token check should be done even on GET. 
-//Otherwise this should be moved to a POST request and rely on regular csrf functionality
-function testConnectionOnServer(connectionId, url, success, failure) {
-	var request = "&connectionId=" + connectionId + "&url=" + url;
-	
-	if( !failure ){	failure = defaultFailure;}
-	
-	new Ajax.Request('ajaxQueryXML', // url
-	{// options
-		method : 'get', // http method
-		parameters : "provider=ConnectionTestProvider" + request,
 		// indicator: 'throbbing'
 		requestHeaders : {
 			"X-CSRF-Token" : getCsrfToken()
@@ -515,7 +537,7 @@ function getPendingAnalysisForTest( testId, success, failure){
 function postBatchSample(success, failure){
     if( !failure){failure = defaultFailure;	}
 	new Ajax.Request(
-		'SamplePatientEntryBatch.do',  //url
+		'SamplePatientEntryBatch',  //url
 		{//options
 			method: 'POST', //http method
 			parameters: jQuery(document.getElementById("mainForm")).serialize().replace(/\+/g,'%20'),
@@ -558,6 +580,22 @@ function getPreviousExperimentSetup(id, success, failure) {
     		"AnalyzerSetup/" + id,  //url
     		{//options
     			method: 'GET', //http method
+    		    onSuccess: success,
+    		    onFailure: failure
+    		}
+    	);
+}
+
+function runLIStoAnalyzerAction(analyzerType, action, success, failure) {
+    if( !failure){failure = defaultFailure;	}
+    new Ajax.Request(
+    		"analyzer/runAction",  //url
+    		{//options
+    			method: 'POST', //http method
+                parameters : "analyzerType=" + analyzerType + "&actionName=" + action,
+				requestHeaders : {
+					"X-CSRF-Token" : getCsrfToken()
+				},
     		    onSuccess: success,
     		    onFailure: failure
     		}

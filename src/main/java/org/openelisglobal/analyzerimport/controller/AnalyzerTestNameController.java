@@ -2,10 +2,8 @@ package org.openelisglobal.analyzerimport.controller;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.openelisglobal.analyzer.service.AnalyzerService;
 import org.openelisglobal.analyzer.valueholder.Analyzer;
 import org.openelisglobal.analyzerimport.form.AnalyzerTestNameForm;
@@ -63,7 +61,7 @@ public class AnalyzerTestNameController extends BaseController {
             RedirectAttributes redirectAttributes)
             throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         AnalyzerTestNameForm newForm = resetSessionFormToType(oldForm, AnalyzerTestNameForm.class);
-        newForm.setCancelAction("CancelAnalyzerTestName.do");
+        newForm.setCancelAction("CancelAnalyzerTestName");
 
         request.setAttribute(ALLOW_EDITS_KEY, "true");
         request.setAttribute(PREVIOUS_DISABLED, "true");
@@ -74,7 +72,6 @@ public class AnalyzerTestNameController extends BaseController {
 
         newForm.setAnalyzerList(analyzerList);
         newForm.setTestList(testList);
-
 
         if (request.getParameter("ID") != null && isValidID(request.getParameter("ID"))) {
             String[] splitId = request.getParameter("ID").split("#");
@@ -166,7 +163,7 @@ public class AnalyzerTestNameController extends BaseController {
 
         } catch (LIMSRuntimeException e) {
             String errorMsg = null;
-            if (e.getException() instanceof org.hibernate.StaleObjectStateException) {
+            if (e.getCause() instanceof org.hibernate.StaleObjectStateException) {
                 errorMsg = "errors.OptimisticLockException";
             } else {
                 errorMsg = "errors.UpdateException";
@@ -223,13 +220,13 @@ public class AnalyzerTestNameController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "analyzerTestNameDefinition";
         } else if (FWD_FAIL.equals(forward)) {
-            return "redirect:/AnalyzerTestNameMenu.do";
+            return "redirect:/AnalyzerTestNameMenu";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/AnalyzerTestNameMenu.do";
+            return "redirect:/AnalyzerTestNameMenu";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "analyzerTestNameDefinition";
         } else if (FWD_CANCEL.equals(forward)) {
-            return "redirect:/AnalyzerTestNameMenu.do";
+            return "redirect:/AnalyzerTestNameMenu";
         } else {
             return "PageNotFound";
         }

@@ -2,7 +2,6 @@ package org.openelisglobal.sampleitem.service;
 
 import java.util.List;
 import java.util.Set;
-
 import org.openelisglobal.common.service.BaseObjectService;
 import org.openelisglobal.sampleitem.valueholder.SampleItem;
 import org.openelisglobal.typeofsample.valueholder.TypeOfSample;
@@ -16,13 +15,9 @@ public interface SampleItemService extends BaseObjectService<SampleItem, String>
 
     List<SampleItem> getPageOfSampleItems(int startingRecNo);
 
-
-
     List<SampleItem> getAllSampleItems();
 
     List<SampleItem> getSampleItemsBySampleId(String id);
-
-
 
     List<SampleItem> getSampleItemsBySampleIdAndStatus(String id, Set<Integer> includedStatusList);
 

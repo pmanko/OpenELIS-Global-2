@@ -1,10 +1,8 @@
 package org.openelisglobal.patient.controller;
 
 import java.lang.reflect.InvocationTargetException;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.openelisglobal.common.exception.LIMSRuntimeException;
 import org.openelisglobal.common.util.DateUtil;
 import org.openelisglobal.patient.action.bean.PatientSearch;
@@ -113,9 +111,9 @@ public class PatientEditByProjectController extends BasePatientEntryByProject {
         if (FWD_SUCCESS.equals(forward)) {
             return "patientEditByProjectDefinition";
         } else if (FWD_FAIL.equals(forward)) {
-            return "redirect:/Dashboard.do";
+            return "redirect:/Dashboard";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/PatientEditByProject.do";
+            return "redirect:/PatientEditByProject?type=readwrite";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "patientEditByProjectDefinition";
         } else {

@@ -2,7 +2,6 @@ package org.openelisglobal.testconfiguration.controller;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-
 import org.hibernate.HibernateException;
 import org.openelisglobal.common.controller.BaseController;
 import org.openelisglobal.common.log.LogEvent;
@@ -52,7 +51,7 @@ public class SampleTypeRenameEntryController extends BaseController {
         if (FWD_SUCCESS.equals(forward)) {
             return "sampleTypeRenameDefinition";
         } else if (FWD_SUCCESS_INSERT.equals(forward)) {
-            return "redirect:/SampleTypeRenameEntry.do";
+            return "redirect:/SampleTypeRenameEntry";
         } else if (FWD_FAIL_INSERT.equals(forward)) {
             return "sampleTypeRenameDefinition";
         } else {

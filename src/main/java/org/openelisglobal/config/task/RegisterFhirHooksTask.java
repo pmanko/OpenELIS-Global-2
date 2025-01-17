@@ -1,13 +1,15 @@
 package org.openelisglobal.config.task;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.parser.DataFormatException;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
 import javax.annotation.PostConstruct;
-
 import org.apache.commons.validator.GenericValidator;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
@@ -33,16 +35,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.parser.DataFormatException;
-import ca.uhn.fhir.rest.client.api.IGenericClient;
-import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
-
 @Component
 public class RegisterFhirHooksTask {
 
     @Value("${org.openelisglobal.fhir.subscriber}")
     private Optional<String> fhirSubscriber;
+
+    @Value("${org.openelisglobal.fhir.subscriber.allowHTTP:false}")
+    private Boolean allowHTTP;
 
     @Value("${org.openelisglobal.fhir.subscriber.resources}")
     private String[] fhirSubscriptionResources;
@@ -71,10 +71,12 @@ public class RegisterFhirHooksTask {
         if (!fhirSubscriber.isPresent() || GenericValidator.isBlankOrNull(fhirSubscriber.get())) {
             return;
         }
-        if (fhirSubscriber.get().startsWith("http://")) {
+        if (!allowHTTP && fhirSubscriber.get().startsWith("http://")) {
             fhirSubscriber = Optional.of("https://" + fhirSubscriber.get().substring("http://".length()));
         }
-        if (!fhirSubscriber.get().startsWith("https://")) {
+
+        if (!(allowHTTP && fhirSubscriber.get().startsWith("http://"))
+                && !fhirSubscriber.get().startsWith("https://")) {
             fhirSubscriber = Optional.of("https://" + fhirSubscriber.get());
         }
 
@@ -94,11 +96,10 @@ public class RegisterFhirHooksTask {
                     ResourceType.Subscription.name() + "/" + createSubscriptionIdForResourceType(resourceType)));
 
             subscriptionBundle.addEntry(bundleEntry);
-
         }
         try {
             Bundle returnedBundle = fhirClient.transaction().withBundle(subscriptionBundle).encodedJson().execute();
-            LogEvent.logDebug(this.getClass().getName(), "startTask", "subscription bundle returned:\n"
+            LogEvent.logDebug(this.getClass().getSimpleName(), "startTask", "subscription bundle returned:\n"
                     + fhirContext.newJsonParser().encodeResourceToString(returnedBundle));
         } catch (UnprocessableEntityException | DataFormatException e) {
             LogEvent.logError("error while communicating subscription bundle to " + localFhirStorePath + " for "
@@ -111,8 +112,8 @@ public class RegisterFhirHooksTask {
         headers.put("Server-Name", ConfigurationProperties.getInstance().getPropertyValue(Property.SiteName));
         headers.put("Server-Code", ConfigurationProperties.getInstance().getPropertyValue(Property.SiteCode));
 
-        dataExportTask.setFhirResources(Arrays.asList(fhirSubscriptionResources).stream()
-                .map(ResourceType::fromCode).collect(Collectors.toList()));
+        dataExportTask.setFhirResources(Arrays.asList(fhirSubscriptionResources).stream().map(ResourceType::fromCode)
+                .collect(Collectors.toList()));
         dataExportTask.setHeaders(headers);
         dataExportTask.setMaxDataExportInterval(backupInterval); // minutes
         dataExportTask.setDataRequestAttemptTimeout(backupTimeout); // seconds // currently unused
@@ -138,9 +139,8 @@ public class RegisterFhirHooksTask {
             }
         }
         Bundle returnedBundle = fhirClient.transaction().withBundle(deleteTransactionBundle).encodedJson().execute();
-        LogEvent.logDebug(this.getClass().getName(), "removeOldSubscription",
+        LogEvent.logTrace(this.getClass().getSimpleName(), "removeOldSubscription",
                 "delete old bundle returned:\n" + fhirContext.newJsonParser().encodeResourceToString(returnedBundle));
-
     }
 
     private String createSubscriptionIdForResourceType(ResourceType resourceType) {
@@ -168,5 +168,4 @@ public class RegisterFhirHooksTask {
     private String createCriteriaString(ResourceType resourceType) {
         return resourceType.name() + "?";
     }
-
 }

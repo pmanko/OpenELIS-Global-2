@@ -11,8 +11,6 @@
 
 <%@ taglib prefix="ajax" uri="/tags/ajaxtags" %>
 
-<%@ taglib uri="http://tiles.apache.org/tags-tiles" prefix="tiles"%>
-
 <c:set var="success" value="${success}" />
 
 <%--bugzilla 1908 changed some disabled values for Vietnam tomcat/linux--%>
@@ -174,6 +172,8 @@ if( typeof(showSuccessMessage) != 'undefined' ){
   		<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
    		<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
   		<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+     <%if( request.getAttribute(IActionConstants.DISPLAY_PREV_NEXT) == null ||
+       ((Boolean)request.getAttribute(IActionConstants.DISPLAY_PREV_NEXT)) ) { %>     
 	    <td>
   			<button type="button" 
   					onclick="previousAction(document.getElementById('mainForm'), '');" 
@@ -199,6 +199,7 @@ if( typeof(showSuccessMessage) != 'undefined' ){
   			   <spring:message code="label.button.next"/>
   			</button>
 	    </td>
+       <% } %>
 	    </tr>
 	 </tbody>
 </table>
