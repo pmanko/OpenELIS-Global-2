@@ -104,12 +104,15 @@ Do not put these in demo specs or demo-facing helpers:
 
 - `page.on("console")` or `page.on("pageerror")`
 - `captureDebugContext`
-- `waitForResponse()` or `expect.poll()` as proof
-- `page.request.get()`, `page.request.put()`, or `page.request.delete()`
+- `waitForResponse()` or `expect.poll()` as proof or synchronization
+- Playwright request APIs or browser `fetch()`
+- network interception or stubbing
 - filesystem or server-state polling to decide pass/fail
 
+These restrictions apply transitively to runtime local imports from demo specs.
 If a test needs backend persistence checks, bridge/simulator proof, seeded-data
-validation, or file-processing contracts, move that test to `harness`.
+validation, or file-processing contracts, move that test to the appropriate
+foundational harness project.
 
 ---
 
@@ -239,7 +242,7 @@ import { Sidenav } from "../fixtures/sidenav";
 
 test("storage page has expanded nav", async ({ page }) => {
   const sidenav = new Sidenav(page);
-  await page.goto("/Storage/samples");
+  await page.goto("/Storage/sample-items");
   await sidenav.expectExpanded();
 });
 ```
@@ -310,7 +313,7 @@ test.describe("Feature Name", () => {
   test("specific behavior being tested", async ({ page }) => {
     // Arrange
     const sidenav = new Sidenav(page);
-    await page.goto("/Storage/samples");
+    await page.goto("/Storage/sample-items");
 
     // Act
     await sidenav.toggle();
@@ -458,7 +461,7 @@ export class StoragePage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto("/Storage/samples");
+    await this.page.goto("/Storage/sample-items");
   }
 
   async selectSample(id: string) {
@@ -612,7 +615,7 @@ assertions with descriptive messages:
 await expect
   .soft(
     page.getByRole("alert"),
-    "Success notification should appear after save"
+    "Success notification should appear after save",
   )
   .toBeVisible({ timeout: 10_000 });
 ```

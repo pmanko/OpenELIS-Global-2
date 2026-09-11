@@ -1,23 +1,28 @@
 import React from "react";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { IntlProvider } from "react-intl";
+import { MemoryRouter } from "react-router-dom";
 import messages from "../../../languages/en.json";
 import AlertsDashboard from "../AlertsDashboard";
+import { getFromOpenElisServer } from "../../utils/Utils";
 
-jest.mock("../../utils/Utils", () => ({
-  ...jest.requireActual("../../utils/Utils"),
-  getFromOpenElisServer: jest.fn(),
-  getFromOpenElisServerV2: jest.fn(),
-  putToOpenElisServer: jest.fn(),
-}));
+vi.mock("../../utils/Utils", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getFromOpenElisServer: vi.fn(),
+    getFromOpenElisServerV2: vi.fn(),
+    putToOpenElisServer: vi.fn(),
+  };
+});
 
-const { getFromOpenElisServer } = require("../../utils/Utils");
+// Replaced inline utils require
 
 const renderWithIntl = (component) => {
   return render(
     <IntlProvider locale="en" messages={messages}>
-      {component}
+      <MemoryRouter>{component}</MemoryRouter>
     </IntlProvider>,
   );
 };
@@ -56,8 +61,8 @@ const mockDashboard = {
 
 describe("AlertsDashboard", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.useFakeTimers();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
     getFromOpenElisServer.mockImplementation((url, callback) => {
       if (url.includes("/summary")) {
         callback(mockSummary);
@@ -68,12 +73,27 @@ describe("AlertsDashboard", () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   test("renders dashboard title", () => {
     renderWithIntl(<AlertsDashboard />);
-    expect(screen.getByText("Alerts Dashboard")).toBeTruthy();
+    // the page name also appears as the current breadcrumb, so scope to the heading
+    expect(
+      screen.getByRole("heading", { name: "Alerts Dashboard" }),
+    ).toBeTruthy();
+  });
+
+  test("renders the full breadcrumb path with Home clickable", () => {
+    renderWithIntl(<AlertsDashboard />);
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(breadcrumb).toBeTruthy();
+    expect(breadcrumb.querySelector('a[href="/"]')?.textContent).toBe("Home");
+    // the current page is named but not a link
+    expect(breadcrumb.textContent).toContain("Alerts Dashboard");
+    expect(
+      Array.from(breadcrumb.querySelectorAll("a")).map((a) => a.textContent),
+    ).toEqual(["Home"]);
   });
 
   test("renders summary tiles with counts", async () => {
@@ -113,5 +133,38 @@ describe("AlertsDashboard", () => {
   test("fetches data on mount", () => {
     renderWithIntl(<AlertsDashboard />);
     expect(getFromOpenElisServer).toHaveBeenCalled();
+  });
+
+  test("offers the microbiology critical alert type filter", () => {
+    renderWithIntl(<AlertsDashboard />);
+    expect(screen.getByText("Microbiology Critical")).toBeTruthy();
+  });
+
+  test("renders a microbiology critical alert row", () => {
+    getFromOpenElisServer.mockImplementation((url, callback) => {
+      if (url.includes("/summary")) {
+        callback(mockSummary);
+      } else if (url.includes("/alerts/dashboard")) {
+        callback({
+          alerts: [
+            {
+              id: 3,
+              alertType: "MICROBIOLOGY_CRITICAL",
+              severity: "CRITICAL",
+              status: "OPEN",
+              message: "Positive blood culture called",
+              startTime: "2026-01-15T12:00:00Z",
+            },
+          ],
+          totalCount: 1,
+          page: 0,
+          pageSize: 25,
+        });
+      }
+    });
+
+    renderWithIntl(<AlertsDashboard />);
+
+    expect(screen.getByText("Positive blood culture called")).toBeTruthy();
   });
 });

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -24,11 +23,9 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.openelisglobal.common.action.IActionConstants;
 import org.openelisglobal.eqa.controller.rest.EQAMyProgramsRestController;
 import org.openelisglobal.eqa.service.EQALabProgramEnrollmentService;
-import org.openelisglobal.eqa.service.EQAProgramService;
 import org.openelisglobal.eqa.valueholder.EQALabEnrollmentLabUnit;
 import org.openelisglobal.eqa.valueholder.EQALabEnrollmentTestMap;
 import org.openelisglobal.eqa.valueholder.EQALabProgramEnrollment;
-import org.openelisglobal.eqa.valueholder.EQAProgram;
 import org.openelisglobal.login.valueholder.UserSessionData;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,40 +37,23 @@ public class EQAMyProgramsRestControllerTest {
     private EQALabProgramEnrollmentService enrollmentService;
 
     @Mock
-    private EQAProgramService eqaProgramService;
-
-    @Mock
     private HttpServletRequest request;
-
-    @Mock
-    private HttpSession session;
 
     @InjectMocks
     private EQAMyProgramsRestController controller;
 
     private EQALabProgramEnrollment enrollment1;
     private EQALabProgramEnrollment enrollment2;
-    private EQAProgram chemistryProgram;
-    private EQAProgram hematologyProgram;
 
     @Before
     public void setUp() {
         UserSessionData usd = new UserSessionData();
         usd.setSytemUserId(1);
-        when(request.getSession()).thenReturn(session);
-        when(session.getAttribute(IActionConstants.USER_SESSION_DATA)).thenReturn(usd);
-
-        chemistryProgram = new EQAProgram();
-        chemistryProgram.setId(1L);
-        chemistryProgram.setName("Chemistry PT");
-
-        hematologyProgram = new EQAProgram();
-        hematologyProgram.setId(2L);
-        hematologyProgram.setName("Hematology PT");
+        when(request.getAttribute(IActionConstants.USER_SESSION_DATA)).thenReturn(usd);
 
         enrollment1 = new EQALabProgramEnrollment();
         enrollment1.setId(1L);
-        enrollment1.setEqaProgram(chemistryProgram);
+        enrollment1.setProgramName("Chemistry PT");
         enrollment1.setProvider("WHO");
         enrollment1.setDescription("Chemistry proficiency testing");
         enrollment1.setIsActive(true);
@@ -94,7 +74,7 @@ public class EQAMyProgramsRestControllerTest {
 
         enrollment2 = new EQALabProgramEnrollment();
         enrollment2.setId(2L);
-        enrollment2.setEqaProgram(hematologyProgram);
+        enrollment2.setProgramName("Hematology PT");
         enrollment2.setProvider("CDC");
         enrollment2.setIsActive(false);
         enrollment2.setCreatedDate(new Date());
@@ -165,13 +145,12 @@ public class EQAMyProgramsRestControllerTest {
 
     @Test
     public void testCreateMyProgram_Success() {
-        when(eqaProgramService.get(1L)).thenReturn(chemistryProgram);
         when(enrollmentService.createEnrollment(
                         any(EQALabProgramEnrollment.class), anyList(), anyList(), anyList()))
                 .thenReturn(enrollment1);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("eqaProgramId", 1);
+        body.put("programName", "Chemistry PT");
         body.put("provider", "WHO");
         body.put("description", "Chemistry proficiency testing");
         body.put("labUnitIds", List.of(100));
@@ -187,7 +166,7 @@ public class EQAMyProgramsRestControllerTest {
     }
 
     @Test
-    public void testCreateMyProgram_MissingProgramId() {
+    public void testCreateMyProgram_MissingProgramName() {
         Map<String, Object> body = new HashMap<>();
         body.put("provider", "WHO");
 
@@ -199,7 +178,7 @@ public class EQAMyProgramsRestControllerTest {
     @Test
     public void testCreateMyProgram_MissingProvider() {
         Map<String, Object> body = new HashMap<>();
-        body.put("eqaProgramId", 1);
+        body.put("programName", "Chemistry PT");
 
         ResponseEntity<?> response = controller.createMyProgram(request, body);
 
@@ -208,13 +187,12 @@ public class EQAMyProgramsRestControllerTest {
 
     @Test
     public void testUpdateMyProgram_Success() {
-        when(eqaProgramService.get(1L)).thenReturn(chemistryProgram);
         when(enrollmentService.updateEnrollment(
                         eq(1L), any(EQALabProgramEnrollment.class), anyList(), anyList(), anyList()))
                 .thenReturn(enrollment1);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("eqaProgramId", 1);
+        body.put("programName", "Chemistry PT");
         body.put("provider", "WHO");
         body.put("labUnitIds", List.of(100));
         body.put("testIds", List.of(200));
@@ -227,13 +205,12 @@ public class EQAMyProgramsRestControllerTest {
 
     @Test
     public void testUpdateMyProgram_NotFound() {
-        when(eqaProgramService.get(2L)).thenReturn(hematologyProgram);
         when(enrollmentService.updateEnrollment(
                         eq(999L), any(EQALabProgramEnrollment.class), any(), any(), any()))
                 .thenThrow(new IllegalArgumentException("Not found"));
 
         Map<String, Object> body = new HashMap<>();
-        body.put("eqaProgramId", 2);
+        body.put("programName", "Hematology PT");
         body.put("provider", "Whatever");
 
         ResponseEntity<?> response = controller.updateMyProgram(request, 999L, body);
@@ -242,7 +219,7 @@ public class EQAMyProgramsRestControllerTest {
     }
 
     @Test
-    public void testUpdateMyProgram_MissingProgramId() {
+    public void testUpdateMyProgram_MissingProgramName() {
         Map<String, Object> body = new HashMap<>();
         body.put("provider", "WHO");
 

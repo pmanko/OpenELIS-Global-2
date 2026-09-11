@@ -4,15 +4,86 @@
 
 For FILE-based analyzer workflows in OpenELIS Global 2:
 
-- Bridge is the runtime owner of directory watching/polling and file transport.
-- OpenELIS owns configuration, bridge registration, direct ingestion endpoint,
-  and result processing.
-- No OpenELIS app-side FILE poller is implemented in this branch. If a fallback
-  poller is added later, it must remain disabled by default unless explicitly
-  enabled.
+- Bridge owns the analyzer connection, its runtime configuration, directory
+  watching/polling, parsing, archive/error handling, and file transport.
+- OpenELIS owns the lab-facing connection reference, local clinical bindings,
+  direct normalized ingestion endpoint, result processing, review, and audit.
+- An OpenELIS app-side FILE poller is outside the target architecture and must
+  not be added. Any proposal to change this requires an explicit architecture
+  decision that supersedes this ownership model.
 
 When guidance conflicts, this ownership model takes precedence for remediation
 work in feature 014.
+
+## OpenELIS Work Product/Engineering Boundary
+
+For analyzer work, `DIGI-UW/openelis-work` is a non-technical product and design
+source only.
+
+- It may define user goals, lab-facing workflows, visible information and
+  states, functional acceptance behavior, and visual/interaction intent.
+- It does not define entities, tables, persistence, JSON structures, APIs,
+  routes, events, payloads, repository ownership, runtime processes,
+  synchronization, migration, or test-layer ownership.
+- Technical-looking labels, annotations, or examples in that repository are
+  non-normative. Do not use them for or against an implementation choice.
+- Derive implementation only from current OpenELIS, Analyzer Bridge, and
+  analyzer-mock code; repository-owned engineering specifications; and an
+  explicit ADR or versioned contract when a new decision is required.
+- Use `openelis-work` screenshots and prototypes for functional and visual
+  comparison, never as an implementation specification.
+
+For the target analyzer architecture, Analyzer Bridge owns portable analyzer
+profiles, durable analyzer connections and their runtime configuration, and
+analyzer-facing behavior (listeners, parsing, probes, protocol execution, and
+FILE watching/transport). OpenELIS owns lab-facing orchestration, the reference
+to a Bridge connection, lab units, local clinical catalog bindings,
+verification/audit, activation intent, operational QC, held results, and review.
+Do not recreate Bridge runtime or connection-configuration authority in
+OpenELIS.
+
+The established working analyzer profile system is the implementation baseline,
+not a disposable legacy model. A profile has exactly two jobs: define
+communication/runtime behavior for one analyzer type, and supply defaults for
+creating a new Bridge connection for that type through the OpenELIS setup
+workflow. Bridge persists the connection's profile pin and runtime values;
+OpenELIS persists only its Bridge connection reference and LIMS-owned state.
+Moving catalog packaging to Bridge, making revisions immutable, and adding
+lifecycle/management UX must evolve those semantics additively. Do not introduce
+a second profile contract, replace profile-owned defaults with frontend/server
+constants, or accept a profile-contract change without unabridged GeneXpert ASTM
+and FluoroCycler compatibility tests across OE setup, Bridge runtime, and
+analyzer mock traffic.
+
+Existing profile content is curated from instrument evidence. A current row is
+retained, corrected, represented as a proven alias, split, or removed according
+to its semantics; current storage or equal LOINC values never create a
+preservation obligation. Do not introduce `LEGACY_UNBOUND`, a legacy profile-row
+domain, or a runtime compatibility path for superseded profile/config storage.
+
+Profile execution is fully data-driven. Production code must not special-case a
+hard-coded profile ID/revision, manufacturer, model, display name, analyzer test
+code, fixture name, or vendor-specific field/value, and it must not duplicate a
+profile-owned default in frontend or server constants. Generic lookup by values
+read from a profile or analyzer pin is expected. Named analyzer profiles belong
+only in profile data and parameterized test fixtures; validators, consumers,
+runtime handlers, and UI composition remain profile-agnostic.
+
+Control-result recognition is Analyzer Type behavior owned by the pinned Bridge
+profile revision. Bridge must use only the profile's explicit recognition mode
+and rules; it must not use an OpenELIS-pushed classifier or a hard-coded
+fallback. `AnalyzerQcRule` is not part of the target architecture. OpenELIS
+operational QC (`QCControlLot`, `QCResult`, statistics, Westgard evaluation,
+violations, and alerts) remains a separate linked workflow and must not gate
+analyzer activation or stale analyzer mapping/recognition verification.
+
+Published Bridge profile revisions are immutable and retained while referenced.
+A Bridge connection pins a profile ID/revision; an OpenELIS analyzer references
+that connection and records the acknowledged profile reference needed for local
+binding verification and audit. Update shared and Duplicate Profile never move a
+configured connection implicitly, and OpenELIS must not keep an authoritative
+copied-profile snapshot, runtime-configuration copy, or per-analyzer mapping
+editor.
 
 > **Purpose:** This file provides comprehensive project context for ALL AI
 > coding agents (Claude, Cursor, Copilot, Jules, Aider, etc.). It contains
@@ -187,7 +258,11 @@ Then customize `.env` for your environment (database passwords, domain, etc.).
 
 **State & Data:**
 
-- **SWR 2.0.3** (data fetching + caching)
+- **No query/cache layer yet.** Data is fetched by hand through
+  `getFromOpenElisServer` callbacks inside `useEffect` (735 calls across 273
+  files). **TanStack Query v4** is the adopted target; see
+  `docs/planning/query-layer-adoption.md`. SWR was listed here but was never
+  installed or used.
 - **React Router DOM 5.2.0** (routing)
 
 **Forms & Validation:**
@@ -214,7 +289,7 @@ Then customize `.env` for your environment (database passwords, domain, etc.).
 - **Playwright 1.57.0** (E2E tests — **recommended for all new tests**)
 - **Cypress 12.17.3** (E2E tests — **deprecated**, existing tests will be
   migrated to Playwright)
-- **Jest + React Testing Library** (unit tests)
+- **Vitest + React Testing Library** (unit tests)
 
 **Code Quality:**
 
@@ -548,6 +623,31 @@ exists in one of them.
 
 ## Development Workflow
 
+### Authoritative Development Stack
+
+Use `scripts/dev-stack` from the root of every clone or worktree. It is the only
+supported interactive development launcher and starts the complete core
+OpenELIS + analyzer harness with worktree-scoped containers, images, networks,
+ports, and volumes.
+
+```bash
+scripts/dev-stack up
+scripts/dev-stack status
+eval "$(scripts/dev-stack env)"  # before Playwright
+scripts/dev-stack down
+```
+
+Never invoke the development Compose files directly or invent per-task Compose
+commands. Never use SQL fixture loaders for feature setup; use property-gated
+application scenario services. `scripts/dev-stack down --volumes --yes` is the
+only supported destructive reset. CI-parity and release tooling are separate
+interfaces and are not replacements for this development path.
+
+Localhost uses random loopback ports and self-signed TLS. Domain-enabled dev
+servers use the same command after setting `LETSENCRYPT_DOMAIN` and
+`LETSENCRYPT_EMAIL` in `.env`; the stack then exposes 80/443 and uses the
+existing Let's Encrypt flow.
+
 ### Initial Setup
 
 ```bash
@@ -571,8 +671,8 @@ cd ..
 # Build OpenELIS WAR
 mvn clean install -DskipTests -Dmaven.test.skip=true
 
-# Start development containers
-docker compose -f dev.docker-compose.yml up -d
+# Start the complete isolated development stack
+scripts/dev-stack up
 ```
 
 **Access Points:**
@@ -713,8 +813,7 @@ mvn spotless:apply
 mvn spotless:check
 
 # Hot reload (after code changes)
-mvn clean install -DskipTests -Dmaven.test.skip=true
-docker compose -f dev.docker-compose.yml up -d --no-deps --force-recreate oe.openelis.org
+scripts/dev-stack up
 ```
 
 **Frontend:**
@@ -745,16 +844,16 @@ npm run cy:run
 
 ```bash
 # Start development environment
-docker compose -f dev.docker-compose.yml up -d
+scripts/dev-stack up
 
 # Stop all containers
-docker compose -f dev.docker-compose.yml down
+scripts/dev-stack down
 
-# Rebuild specific container (after code changes)
-docker compose -f dev.docker-compose.yml up -d --no-deps --force-recreate oe.openelis.org
+# Explicitly reset this worktree's data
+scripts/dev-stack down --volumes --yes
 
 # View logs
-docker compose -f dev.docker-compose.yml logs -f oe.openelis.org
+scripts/dev-stack logs -f oe.openelis.org
 ```
 
 ### Branch Strategy
@@ -993,13 +1092,16 @@ for comprehensive guide.
 
 ```bash
 # Load test fixtures (basic usage)
-./src/test/resources/load-test-fixtures.sh
+./src/test/resources/load-test-fixtures.sh --profile=core
+
+# Harness fixture lane (includes HARN-* lane data)
+./src/test/resources/load-test-fixtures.sh --profile=harness
 
 # Reset database before loading (clean state)
-./src/test/resources/load-test-fixtures.sh --reset
+./src/test/resources/load-test-fixtures.sh --profile=core --reset
 
 # Load without verification (faster)
-./src/test/resources/load-test-fixtures.sh --no-verify
+./src/test/resources/load-test-fixtures.sh --profile=core --no-verify
 ```
 
 **Fixture Loading:**
@@ -1300,18 +1402,23 @@ public class StorageLocationDAOTest extends BaseWebContextSensitiveTest {
 
 **Template:** `.specify/templates/testing/DataJpaTestDao.java.template`
 
-### Frontend Unit Tests (Jest + React Testing Library)
+### Frontend Unit Tests (Vitest + React Testing Library)
 
 **Location:** `frontend/src/components/{feature}/*.test.jsx` or
 `frontend/src/components/{feature}/__tests__/*.test.jsx`
 
+**Project configuration:** Vitest with `globals: true` (see
+`frontend/vite.config.ts`). `vi`, `describe`, `it`, `expect`, `beforeEach`,
+`afterEach` are globally available — use `vi.*` (not `jest.*`).
+`@testing-library/jest-dom` matchers are wired via `frontend/src/setupTests.js`.
+
 **For Comprehensive Guidance**: See
-[Testing Roadmap - Jest + React Testing Library](.specify/guides/testing-roadmap.md#jest--react-testing-library-unit-tests)
+[Testing Roadmap - Vitest + React Testing Library](.specify/guides/testing-roadmap.md#jest--react-testing-library-unit-tests)
 for detailed patterns, code examples, and best practices.
 
 **For Quick Reference**: See
-[Jest Best Practices Guide](.specify/guides/jest-best-practices.md) for common
-patterns and cheat sheets.
+[Vitest Best Practices Guide](.specify/guides/vitest-best-practices.md) for
+common patterns, cheat sheets, and a Vitest↔Jest API mapping table.
 
 **TDD Workflow (MANDATORY for complex logic):**
 
@@ -1320,7 +1427,7 @@ patterns and cheat sheets.
 - **Refactor**: Improve code quality while keeping tests green
 
 **SDD Checkpoint:** After Phase 4 (Frontend), all unit tests MUST pass  
-**Coverage Goal:** >70% (measured via Jest)
+**Coverage Goal:** >70% (measured via Vitest + `@vitest/coverage-v8`)
 
 **Pattern:**
 
@@ -1334,9 +1441,9 @@ import { BrowserRouter } from "react-router-dom";
 import ComponentName from "./ComponentName";
 import messages from "../../../languages/en.json";
 
-// Mock utilities BEFORE imports (Jest hoisting)
-jest.mock("../utils/Utils", () => ({
-  getFromOpenElisServer: jest.fn(),
+// Mock utilities BEFORE imports (Vitest hoists vi.mock automatically)
+vi.mock("../utils/Utils", () => ({
+  getFromOpenElisServer: vi.fn(),
 }));
 
 const renderWithIntl = (component) => {
@@ -1392,7 +1499,7 @@ describe("ComponentName", () => {
 - ❌ Testing implementation details (test user-visible behavior)
 - ❌ Inconsistent import order
 
-**Template:** `.specify/templates/testing/JestComponent.test.jsx.template`
+**Template:** `.specify/templates/testing/VitestComponent.test.jsx.template`
 
 ### ORM Validation Tests (Constitution V.4)
 
@@ -1663,10 +1770,10 @@ must be explicitly added to a project's `testMatch` allowlist in
 
 #### CI Workflows
 
-| Workflow                                   | Compose Files                                          | Projects Run               | Fixtures Loaded                                    |
-| ------------------------------------------ | ------------------------------------------------------ | -------------------------- | -------------------------------------------------- |
-| `e2e-playwright.yml` (`playwright-core`)   | `build.docker-compose.yml`                             | `core-app` + `core-demo`   | `file-import-e2e.sql`                              |
-| `e2e-playwright-analyzer-harness-reusable` | `build.docker-compose.yml` + `ci.analyzer-harness.yml` | `harness` + `harness-demo` | `analyzer-harness-e2e.sql` + `file-import-e2e.sql` |
+| Workflow                                   | Compose Files                                          | Projects Run               | Fixtures Loaded                           |
+| ------------------------------------------ | ------------------------------------------------------ | -------------------------- | ----------------------------------------- |
+| `e2e-playwright.yml` (`playwright-core`)   | `build.docker-compose.yml`                             | `core-app` + `core-demo`   | `load-test-fixtures.sh --profile=core`    |
+| `e2e-playwright-analyzer-harness-reusable` | `build.docker-compose.yml` + `ci.analyzer-harness.yml` | `harness` + `harness-demo` | `load-test-fixtures.sh --profile=harness` |
 
 #### Key Patterns
 
@@ -1778,8 +1885,9 @@ npm run pw:test:ui
 
 **Prerequisites:**
 
-1. App running at `https://localhost` (or set `BASE_URL`)
+1. App running through `scripts/dev-stack up`
 2. Auth env vars: `TEST_USER` and `TEST_PASS`
+3. Run `eval "$(scripts/dev-stack env)"` from the repo root
 
 **Core-app tests (build stack):**
 
@@ -1842,8 +1950,9 @@ TEST_USER=admin TEST_PASS='adminADMIN!' npm run pw:test -- --project=harness-dem
 - **Backend Testing Best Practices**:
   `.specify/guides/backend-testing-best-practices.md` - Quick reference for
   backend Java/Spring Framework testing patterns
-- **Jest Best Practices**: `.specify/guides/jest-best-practices.md` - Quick
-  reference for Jest + React Testing Library patterns
+- **Vitest Best Practices**: `.specify/guides/vitest-best-practices.md` - Quick
+  reference for Vitest + React Testing Library patterns (includes a Vitest↔Jest
+  API mapping table for porting existing tests)
 - **Cypress Best Practices**: `.specify/guides/cypress-best-practices.md` -
   Quick reference for Cypress patterns
 
@@ -1859,9 +1968,9 @@ TEST_USER=admin TEST_PASS='adminADMIN!' npm run pw:test -- --project=harness-dem
     tests (BaseWebContextSensitiveTest)
   - DAO Tests: `.specify/templates/testing/DataJpaTestDao.java.template` - DAO
     tests (BaseWebContextSensitiveTest)
-  - Jest Component:
-    `.specify/templates/testing/JestComponent.test.jsx.template` - Frontend unit
-    tests
+  - Vitest Component:
+    `.specify/templates/testing/VitestComponent.test.jsx.template` - Frontend
+    unit tests (Vitest `vi.*` APIs, `describe/it/expect` globals)
   - Cypress E2E: `.specify/templates/testing/CypressE2E.cy.js.template` - E2E
     tests
 
@@ -2219,11 +2328,11 @@ Before creating PR, verify ALL items:
 - **Pull Request Tips:** `PULL_REQUEST_TIPS.md` (15-point checklist)
 - **Code of Conduct:** `CODE_OF_CONDUCT.md` (community standards)
 - **Dev Setup:** `docs/dev_setup.md` (detailed development environment setup)
-- **E2E CI Architecture:** `.specify/reports/ci-e2e-architecture-spec.md` -
-  concise source of truth for fork/non-fork E2E workflow topology, artifact
-  contracts, and checkpoint/status semantics
-- **E2E CI Operator Model:** `.github/e2e-ci-operator-model.md` - operational
-  troubleshooting guide for CI maintainers
+- **E2E CI Architecture:** `specs/plans/ci-e2e-architecture-spec.md` - concise
+  source of truth for fork/non-fork E2E workflow topology, artifact contracts,
+  and checkpoint/status semantics
+- **E2E CI Operator Model:** `specs/plans/e2e-ci-operator-model.md` -
+  operational troubleshooting guide for CI maintainers
 
 ### Testing Documentation
 
@@ -2235,8 +2344,8 @@ Before creating PR, verify ALL items:
   E2E-specific fixture guide
 - **Cypress Best Practices:** `.specify/guides/cypress-best-practices.md` -
   Cypress patterns
-- **Jest Best Practices:** `.specify/guides/jest-best-practices.md` - Jest
-  patterns
+- **Vitest Best Practices:** `.specify/guides/vitest-best-practices.md` - Vitest
+  patterns + Vitest↔Jest API mapping
 - **Backend Testing Best Practices:**
   `.specify/guides/backend-testing-best-practices.md` - Backend patterns
 
@@ -2281,8 +2390,7 @@ mvn clean install -DskipTests -Dmaven.test.skip=true
 mvn spotless:apply && cd frontend && npm run format && cd ..
 
 # Hot reload backend
-mvn clean install -DskipTests -Dmaven.test.skip=true
-docker compose -f dev.docker-compose.yml up -d --no-deps --force-recreate oe.openelis.org
+scripts/dev-stack up
 
 # E2E tests - ALWAYS use npm scripts (unset ELECTRON_RUN_AS_NODE is required)
 npm run cy:spec "cypress/e2e/{feature}.cy.js"  # Individual test (development)

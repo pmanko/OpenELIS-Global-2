@@ -225,9 +225,12 @@ public class DictionaryConfigurationHandler implements DomainConfigurationHandle
 
         DictionaryCategory category = getOrCreateCategory(categoryName);
 
-        // The same entry name CAN exist in different categories
-        Dictionary existingDict = dictionaryService.getDictionaryEntrysByNameAndCategoryDescription(dictEntry,
-                categoryName);
+        // CSV `category` column matches dictionary_category.name, consistent with
+        // getOrCreateCategory(categoryName) above. Looking up an existing row by
+        // description would silently fail for legacy categories where name and
+        // description diverge (e.g. id=218: name="Marital Status Demographic
+        // Information", description="Possible marriage status").
+        Dictionary existingDict = dictionaryService.getDictionaryEntryByNameAndCategoryName(dictEntry, categoryName);
         if (existingDict != null) {
             updateDictionaryFromCsv(existingDict, values, category, localAbbreviationIndex, isActiveIndex,
                     sortOrderIndex, loincCodeIndex, dictEntry, localizationColumns);
@@ -272,38 +275,35 @@ public class DictionaryConfigurationHandler implements DomainConfigurationHandle
         int suffix = 1;
 
         while (suffix <= 99) {
-            try {
-                DictionaryCategory category = new DictionaryCategory();
-                category.setCategoryName(categoryName);
-                // Use category name as description to avoid duplicate description conflicts
-                category.setDescription(categoryName);
-                category.setLocalAbbreviation(abbreviation);
-                category.setSysUserId("1"); // System user for configuration loading
+            DictionaryCategory candidate = new DictionaryCategory();
+            candidate.setCategoryName(categoryName);
+            candidate.setDescription(categoryName);
+            candidate.setLocalAbbreviation(abbreviation);
 
-                String categoryId = dictionaryCategoryService.insert(category);
-                category = dictionaryCategoryService.get(categoryId);
+            // Check for duplicates before inserting to avoid poisoning the JPA session
+            // with a constraint-violation flush (which marks the transaction
+            // rollback-only).
+            if (!dictionaryCategoryService.duplicateDictionaryCategoryExists(candidate)) {
+                String categoryId = dictionaryCategoryService.insert(candidate);
+                DictionaryCategory created = dictionaryCategoryService.get(categoryId);
                 LogEvent.logInfo(this.getClass().getSimpleName(), "tryCreateCategoryWithUniqueAbbreviation",
                         "Created new dictionary category: " + categoryName + " with abbreviation: " + abbreviation);
-                return category;
-
-            } catch (org.openelisglobal.common.exception.LIMSDuplicateRecordException e) {
-                // Duplicate found, try with a suffix
-                LogEvent.logDebug(this.getClass().getSimpleName(), "tryCreateCategoryWithUniqueAbbreviation",
-                        "Abbreviation " + abbreviation + " already exists, trying with suffix " + suffix);
-
-                int maxBaseLength = 5 - String.valueOf(suffix).length();
-                if (maxBaseLength < 1) {
-                    maxBaseLength = 1;
-                }
-                String truncatedBase = baseAbbreviation.length() > maxBaseLength
-                        ? baseAbbreviation.substring(0, maxBaseLength)
-                        : baseAbbreviation;
-                abbreviation = truncatedBase + suffix;
-                suffix++;
+                return created;
             }
+
+            LogEvent.logDebug(this.getClass().getSimpleName(), "tryCreateCategoryWithUniqueAbbreviation",
+                    "Abbreviation " + abbreviation + " already exists, trying with suffix " + suffix);
+            int maxBaseLength = 5 - String.valueOf(suffix).length();
+            if (maxBaseLength < 1) {
+                maxBaseLength = 1;
+            }
+            String truncatedBase = baseAbbreviation.length() > maxBaseLength
+                    ? baseAbbreviation.substring(0, maxBaseLength)
+                    : baseAbbreviation;
+            abbreviation = truncatedBase + suffix;
+            suffix++;
         }
 
-        // If we exhausted all attempts, throw an exception
         throw new IllegalStateException(
                 "Could not create dictionary category '" + categoryName + "' - exhausted all abbreviation attempts");
     }
@@ -315,7 +315,7 @@ public class DictionaryConfigurationHandler implements DomainConfigurationHandle
         dictionary.setDictionaryCategory(category);
 
         String localAbbreviation = getValueOrEmpty(values, localAbbreviationIndex);
-        if (!localAbbreviation.isEmpty()) {
+        if (!localAbbreviation.isEmpty() && !localAbbreviation.equals(dictionary.getLocalAbbreviation())) {
             dictionary.setLocalAbbreviation(localAbbreviation);
         }
 
@@ -340,9 +340,6 @@ public class DictionaryConfigurationHandler implements DomainConfigurationHandle
         if (!loincCode.isEmpty()) {
             dictionary.setLoincCode(loincCode);
         }
-
-        // Set system user ID for audit
-        dictionary.setSysUserId("1"); // System user for configuration loading
 
         // Handle localization
         processLocalization(dictionary, values, dictEntry, localizationColumns);
@@ -369,7 +366,6 @@ public class DictionaryConfigurationHandler implements DomainConfigurationHandle
         if (localization == null) {
             localization = new Localization();
             localization.setDescription("dictionary entry: " + dictEntry);
-            localization.setSysUserId("1");
             isNewLocalization = true;
         }
 

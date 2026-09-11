@@ -59,7 +59,48 @@ public interface SampleStorageService {
     java.util.Map<String, Object> updateAssignmentMetadata(String sampleItemId, String positionCoordinate,
             String notes);
 
-    java.util.Map<String, Object> disposeSampleItem(String sampleItemId, String reason, String method, String notes);
+    /**
+     * Dispose a SampleItem. The audit emission for the global audit trail rides on
+     * {@code SampleItemService.update} (AuditableBaseObject path), so the caller
+     * MUST pass the acting user's sysUserId (numeric String). The same id is
+     * stamped on the storage-movement row for the per-sample audit modal.
+     *
+     * <p>
+     * OGC-738: previously the disposal hardcoded {@code movedByUserId=1} and called
+     * {@code sampleItemDAO.update} directly, bypassing audit emit.
+     */
+    java.util.Map<String, Object> disposeSampleItem(String sampleItemId, String reason, String method, String notes,
+            String sysUserId);
+
+    /**
+     * Record usage against a SampleItem's remaining quantity (OGC-1026, Results
+     * Entry v3 R7). Partial use decrements {@code remainingQuantity} (never below
+     * zero); {@code markUsedUp} zeroes it — "exhausted" is remaining == 0, not a
+     * status, and disposal stays an explicit follow-up step. The update rides
+     * {@code SampleItemService.update} so the global audit row reflects the acting
+     * user.
+     *
+     * @param sampleItemId flexible identifier (internal id, accession number, or
+     *                     external id)
+     * @param amountUsed   amount consumed; required unless markUsedUp
+     * @param markUsedUp   true to zero the remaining quantity outright
+     * @param sysUserId    acting user's numeric id (required for audit)
+     * @return quantity snapshot: sampleItemId, quantity, remainingQuantity,
+     *         exhausted
+     */
+    java.util.Map<String, Object> recordSampleUsage(String sampleItemId, java.math.BigDecimal amountUsed,
+            boolean markUsedUp, String sysUserId);
+
+    /**
+     * List storage movements for a SampleItem with the acting user's display name
+     * resolved. Returns one Map per movement with the same shape the audit modal
+     * already renders, plus a {@code movedByUserName} field.
+     *
+     * <p>
+     * OGC-738a: the controller used to return the raw numeric user id; the View
+     * Audit modal showed "Moved By: 42" with no way to identify who.
+     */
+    java.util.List<java.util.Map<String, Object>> getSampleItemMovementsWithUserNames(String sampleItemId);
 
     /**
      * Get storage location for a specific SampleItem

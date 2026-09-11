@@ -73,8 +73,9 @@ public class SampleEditController extends BaseController {
     private static final String[] ALLOWED_FIELDS = new String[] { "initialSampleConditionList", "sampleXML",
             //
             "sampleOrderItems.newRequesterName", "sampleOrderItems.modified", "sampleOrderItems.sampleId",
-            "sampleOrderItems.labNo", "sampleOrderItems.requestDate", "sampleOrderItems.receivedDateForDisplay",
-            "sampleOrderItems.receivedTime", "sampleOrderItems.nextVisitDate", "sampleOrderItems.requesterSampleID",
+            "sampleOrderItems.labNo", "sampleOrderItems.requiredBy", "sampleOrderItems.requestDate",
+            "sampleOrderItems.receivedDateForDisplay", "sampleOrderItems.receivedTime",
+            "sampleOrderItems.nextVisitDate", "sampleOrderItems.requesterSampleID",
             "sampleOrderItems.referringPatientNumber", "sampleOrderItems.referringSiteId",
             "sampleOrderItems.referringSiteName", "sampleOrderItems.referringSiteCode",
             "sampleOrderItems.referringSiteDepartmentId", "sampleOrderItems.referringSiteDepartmentName",
@@ -94,17 +95,16 @@ public class SampleEditController extends BaseController {
 
     // private ObservationHistory paymentObservation = null;
     private static final SampleEditItemComparator testComparator = new SampleEditItemComparator();
-    private static final Set<Integer> excludedAnalysisStatusList;
-    private static final Set<Integer> ENTERED_STATUS_SAMPLE_LIST = new HashSet<>();
+    private static final Set<String> excludedAnalysisStatusList;
+    private static final Set<String> ENTERED_STATUS_SAMPLE_LIST = new HashSet<>();
     private static final Collection<String> ABLE_TO_CANCEL_ROLE_NAMES = new ArrayList<>();
 
     static {
         excludedAnalysisStatusList = new HashSet<>();
-        excludedAnalysisStatusList.add(
-                Integer.parseInt(SpringContext.getBean(IStatusService.class).getStatusID(AnalysisStatus.Canceled)));
+        excludedAnalysisStatusList
+                .add(SpringContext.getBean(IStatusService.class).getStatusID(AnalysisStatus.Canceled));
 
-        ENTERED_STATUS_SAMPLE_LIST
-                .add(Integer.parseInt(SpringContext.getBean(IStatusService.class).getStatusID(SampleStatus.Entered)));
+        ENTERED_STATUS_SAMPLE_LIST.add(SpringContext.getBean(IStatusService.class).getStatusID(SampleStatus.Entered));
         ABLE_TO_CANCEL_ROLE_NAMES.add("Validator");
         ABLE_TO_CANCEL_ROLE_NAMES.add("Validation");
         ABLE_TO_CANCEL_ROLE_NAMES.add("Biologist");

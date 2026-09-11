@@ -21,7 +21,6 @@
         <property name="hibernate.order_updates">true</property>
         <!-- <property name="transaction.factory_class">org.hibernate.transaction.JDBCTransactionFactory</property>
             <property name="current_session_context_class">thread</property> -->
-        <property name="hibernate.query.factory_class">org.hibernate.hql.internal.classic.ClassicQueryTranslatorFactory</property>
         <property name="hibernate.cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
         <property name="hibernate.cache.use_second_level_cache">false</property>
         <property name="hibernate.cache.use_query_cache">false</property>
@@ -114,6 +113,9 @@
         <mapping resource="hibernate/hbm/ReferralType.hbm.xml" />
         <mapping resource="hibernate/hbm/Referral.hbm.xml" />
         <mapping resource="hibernate/hbm/ReferralResult.hbm.xml" />
+        <mapping resource="hibernate/hbm/ReferralSubcontract.hbm.xml" />
+        <mapping
+            resource="hibernate/hbm/ReferralStatusHistory.hbm.xml" />
         <mapping resource="hibernate/hbm/TestCodeType.hbm.xml" />
         <mapping
             resource="hibernate/hbm/OrganizationHL7Schema.hbm.xml" />

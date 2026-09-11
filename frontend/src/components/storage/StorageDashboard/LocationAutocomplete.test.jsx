@@ -1,6 +1,5 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { waitFor } from "@testing-library/dom";
 import "@testing-library/jest-dom";
 import { IntlProvider } from "react-intl";
 import LocationAutocomplete from "./LocationAutocomplete";
@@ -8,8 +7,8 @@ import { getFromOpenElisServer } from "../../utils/Utils";
 import messages from "../../../languages/en.json";
 
 // Mock the API utilities
-jest.mock("../../utils/Utils", () => ({
-  getFromOpenElisServer: jest.fn(),
+vi.mock("../../utils/Utils", () => ({
+  getFromOpenElisServer: vi.fn(),
 }));
 
 const renderWithIntl = (component) => {
@@ -55,7 +54,7 @@ describe("LocationAutocomplete", () => {
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   /**
@@ -69,7 +68,7 @@ describe("LocationAutocomplete", () => {
       }
     });
 
-    const onLocationSelect = jest.fn();
+    const onLocationSelect = vi.fn();
     const { rerender } = renderWithIntl(
       <LocationAutocomplete
         onLocationSelect={onLocationSelect}
@@ -106,7 +105,7 @@ describe("LocationAutocomplete", () => {
       }
     });
 
-    const onLocationSelect = jest.fn();
+    const onLocationSelect = vi.fn();
     renderWithIntl(
       <LocationAutocomplete
         onLocationSelect={onLocationSelect}
@@ -132,7 +131,7 @@ describe("LocationAutocomplete", () => {
       }
     });
 
-    const onLocationSelect = jest.fn();
+    const onLocationSelect = vi.fn();
     renderWithIntl(
       <LocationAutocomplete
         onLocationSelect={onLocationSelect}

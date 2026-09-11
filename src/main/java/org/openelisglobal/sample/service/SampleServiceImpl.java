@@ -269,6 +269,12 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
     @Override
     @Transactional(readOnly = true)
     public Person getPersonRequester(Sample sample) {
+        return getPersonRequester(sample, PERSON_REQUESTER_TYPE_ID);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Person getPersonRequester(Sample sample, long requesterTypeId) {
         if (sample == null) {
             return null;
         }
@@ -276,7 +282,7 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
         List<SampleRequester> requesters = sampleRequesterService.getRequestersForSampleId(sample.getId());
 
         for (SampleRequester requester : requesters) {
-            if (PERSON_REQUESTER_TYPE_ID == requester.getRequesterTypeId()) {
+            if (requesterTypeId == requester.getRequesterTypeId()) {
                 Person person = new Person();
                 person.setId(String.valueOf(requester.getRequesterId()));
                 personService.getData(person);
@@ -357,22 +363,21 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
     public Sample getPatientPreviousSampleForTestName(Sample sample, Patient patient, String testName) {
         List<Sample> patientSampleList = sampleHumanService.getSamplesForPatient(patient.getId());
         Sample previousSample = null;
-        List<Integer> sampIDList = new ArrayList<>();
-        List<Integer> testIDList = new ArrayList<>();
+        List<String> sampIDList = new ArrayList<>();
+        List<String> testIDList = new ArrayList<>();
 
-        testIDList.add(Integer.parseInt(testService.getTestByLocalizedName(testName).getId()));
+        testIDList.add(testService.getTestByLocalizedName(testName).getId());
 
         if (patientSampleList.isEmpty()) {
             return previousSample;
         }
 
         for (Sample patientSample : patientSampleList) {
-            sampIDList.add(Integer.parseInt(patientSample.getId()));
+            sampIDList.add(patientSample.getId());
         }
 
-        List<Integer> statusList = new ArrayList<>();
-        statusList.add(
-                Integer.parseInt(SpringContext.getBean(IStatusService.class).getStatusID(AnalysisStatus.Finalized)));
+        List<String> statusList = new ArrayList<>();
+        statusList.add(SpringContext.getBean(IStatusService.class).getStatusID(AnalysisStatus.Finalized));
 
         List<Analysis> analysisList = analysisService.getAnalysesBySampleIdTestIdAndStatusId(sampIDList, testIDList,
                 statusList);
@@ -415,8 +420,8 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
 
     @Override
     @Transactional(readOnly = true)
-    public List<Sample> getSamplesByProjectAndStatusIDAndAccessionRange(List<Integer> inclusiveProjectIdList,
-            List<Integer> inclusiveStatusIdList, String minAccession, String maxAccession) {
+    public List<Sample> getSamplesByProjectAndStatusIDAndAccessionRange(List<String> inclusiveProjectIdList,
+            List<String> inclusiveStatusIdList, String minAccession, String maxAccession) {
         if (minAccession != null && minAccession.contains(".")) {
             minAccession = minAccession.substring(0, minAccession.indexOf('.'));
         }
@@ -430,7 +435,7 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
     @Override
     @Transactional(readOnly = true)
     public List<Sample> getSamplesByProjectAndStatusIDAndAccessionRange(String projectId,
-            List<Integer> inclusiveStatusIdList, String minAccession, String maxAccession) {
+            List<String> inclusiveStatusIdList, String minAccession, String maxAccession) {
         if (minAccession != null && minAccession.contains(".")) {
             minAccession = minAccession.substring(0, minAccession.indexOf('.'));
         }
@@ -526,6 +531,12 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Sample> getSamplesNewestFirst(int startingRecNo, int pageSize) {
+        return getBaseObjectDAO().getSamplesNewestFirst(startingRecNo, pageSize);
+    }
+
+    @Override
     public String generateAccessionNumberAndInsert(Sample sample) {
         sample.setAccessionNumber(getBaseObjectDAO().getNextAccessionNumber());
         return insert(sample);
@@ -605,5 +616,10 @@ public class SampleServiceImpl extends AuditableBaseObjectServiceImpl<Sample, St
     @Transactional(readOnly = true)
     public List<Sample> getSamplesByPriority(OrderPriority priority) {
         return sampleDAO.getSamplesByPriority(priority);
+    }
+
+    @Override
+    public List<Sample> findSamplesWithRequiredByBefore(java.sql.Timestamp horizon) {
+        return sampleDAO.findSamplesWithRequiredByBefore(horizon);
     }
 }

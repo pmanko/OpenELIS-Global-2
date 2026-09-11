@@ -2,6 +2,8 @@ package org.openelisglobal.analyzerresults.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.analysis.service.AnalysisService;
 import org.openelisglobal.analysis.valueholder.Analysis;
@@ -50,6 +52,7 @@ public class AnalyzerResultsServiceImpl extends AuditableBaseObjectServiceImpl<A
 
     AnalyzerResultsServiceImpl() {
         super(AnalyzerResults.class);
+        this.auditTrailLog = true;
     }
 
     @Override
@@ -69,12 +72,42 @@ public class AnalyzerResultsServiceImpl extends AuditableBaseObjectServiceImpl<A
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<AnalyzerResults> findHeldResultValuesByProfile(String profileId, int profileRevision) {
+        return getBaseObjectDAO().findHeldResultValuesByProfile(profileId, profileRevision);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Long> countHeldResultsByAnalyzerIds(List<String> analyzerIds) {
+        return getBaseObjectDAO().countHeldResultsByAnalyzerIds(analyzerIds);
+    }
+
+    /**
+     * Persists normalized Bridge results in the OpenELIS review queue. A matching
+     * held row advances in place once its local binding can resolve the same raw
+     * observation. Exact replays are ignored, while a genuinely changed observation
+     * remains linked for explicit review instead of silently replacing clinical
+     * data.
+     */
+    @Override
+    @Transactional
     public void insertAnalyzerResults(List<AnalyzerResults> results, String sysUserId) {
         try {
             for (AnalyzerResults result : results) {
                 boolean duplicateByAccessionAndTestOnly = false;
                 List<AnalyzerResults> previousResults = baseObjectDAO.getDuplicateResultByAccessionAndTest(result);
                 AnalyzerResults previousResult = null;
+
+                AnalyzerResults heldResult = findMatchingHeldResult(previousResults, result);
+                if (heldResult != null && isActionable(result)) {
+                    result.setId(heldResult.getId());
+                    result.setLastupdated(heldResult.getLastupdated());
+                    result.setDuplicateAnalyzerResultId(null);
+                    result.setSysUserId(sysUserId);
+                    update(result);
+                    continue;
+                }
 
                 // Duplicate detection: skip insert if an existing staging entry matches.
                 // Match on timestamp (instrument date) OR result value (re-import of same
@@ -122,6 +155,29 @@ public class AnalyzerResultsServiceImpl extends AuditableBaseObjectServiceImpl<A
             LogEvent.logError(e);
             throw new LIMSRuntimeException("Error in AnalyzerResult insertAnalyzerResult()", e);
         }
+    }
+
+    private AnalyzerResults findMatchingHeldResult(List<AnalyzerResults> previousResults, AnalyzerResults incoming) {
+        if (previousResults == null) {
+            return null;
+        }
+        return previousResults.stream()
+                .filter(previous -> previous.isReadOnly()
+                        && !GenericValidator.isBlankOrNull(previous.getImportIssueReason())
+                        && sameText(previous.getSourceConnectionId(), incoming.getSourceConnectionId())
+                        && sameText(previous.getSourceProfileId(), incoming.getSourceProfileId())
+                        && Objects.equals(previous.getSourceProfileRevision(), incoming.getSourceProfileRevision())
+                        && sameText(previous.getRawTestCode(), incoming.getRawTestCode())
+                        && sameText(previous.getRawResultValue(), incoming.getRawResultValue()))
+                .findFirst().orElse(null);
+    }
+
+    private boolean isActionable(AnalyzerResults result) {
+        return !result.isReadOnly() && GenericValidator.isBlankOrNull(result.getImportIssueReason());
+    }
+
+    private boolean sameText(String left, String right) {
+        return !GenericValidator.isBlankOrNull(left) && left.equals(right);
     }
 
     @Override

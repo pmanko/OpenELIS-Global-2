@@ -6,9 +6,13 @@ FROM maven:3-eclipse-temurin-21 AS build
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
-    && apt-get -y update \
-    && apt-get -y --no-install-recommends install \
-    git apache2-utils nodejs npm
+    && sed -i 's|http://archive.ubuntu.com|http://azure.archive.ubuntu.com|g; s|http://security.ubuntu.com|http://azure.archive.ubuntu.com|g' \
+        /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=60 \
+        --allow-releaseinfo-change -y update \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=60 \
+        -y --no-install-recommends install \
+        git apache2-utils
 
 
 # OE Default Password
@@ -37,22 +41,23 @@ RUN --mount=type=cache,target=/root/.m2,sharing=locked \
 ##
 # Build the Project
 #
-# NOTE: Each step restores dataexport artifacts into the cache mount if missing.
-# When BuildKit restores cached layers from GHA, the --mount=type=cache volume
-# starts empty (it is not part of the layer blob). Without this restore step,
-# the main project build cannot resolve org.itech:dataexport-* dependencies.
+# NOTE: Each step overlays dataexport artifacts into the cache mount. The
+# org/itech directory may already exist without the required dataexport
+# versions, so checking only for that parent directory is insufficient.
 #
 WORKDIR /build
 
 COPY ./pom.xml /build/pom.xml
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
-    [ -d /root/.m2/repository/org/itech ] || { mkdir -p /root/.m2/repository/org && cp -r /build/dataexport-m2/org/itech /root/.m2/repository/org/; } \
+    mkdir -p /root/.m2/repository/org/itech \
+    && cp -r /build/dataexport-m2/org/itech/. /root/.m2/repository/org/itech/ \
     && mvn dependency:go-offline
 
 ARG SKIP_SPOTLESS="false"
 COPY ./src /build/src
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
-    [ -d /root/.m2/repository/org/itech ] || { mkdir -p /root/.m2/repository/org && cp -r /build/dataexport-m2/org/itech /root/.m2/repository/org/; } \
+    mkdir -p /root/.m2/repository/org/itech \
+    && cp -r /build/dataexport-m2/org/itech/. /root/.m2/repository/org/itech/ \
     && mvn clean install -Dmaven.test.skip=true -DskipITs=true -Dspotless.check.skip=${SKIP_SPOTLESS}
 
 ##

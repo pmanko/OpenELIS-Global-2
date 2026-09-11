@@ -77,6 +77,17 @@ public interface AnalyzerTypeService extends BaseObjectService<AnalyzerType, Str
     List<AnalyzerType> getAllWithInitializedInstances();
 
     /**
+     * Get a single analyzer type with its instances collection eagerly initialized.
+     * Use this when a REST controller needs to access `getInstances()` on the
+     * returned entity outside the service transaction (otherwise Hibernate throws
+     * LazyInitializationException).
+     *
+     * @param id The analyzer type ID
+     * @return The AnalyzerType with initialized instances, or null if not found
+     */
+    AnalyzerType getByIdWithInitializedInstances(String id);
+
+    /**
      * Get all analyzer instances for a given type.
      *
      * @param analyzerTypeId The ID of the analyzer type
@@ -84,11 +95,4 @@ public interface AnalyzerTypeService extends BaseObjectService<AnalyzerType, Str
      */
     List<Analyzer> getInstancesForType(String analyzerTypeId);
 
-    /**
-     * Create a default analyzer instance for a type if none exists.
-     *
-     * @param analyzerType The analyzer type
-     * @return The created or existing default Analyzer instance
-     */
-    Analyzer getOrCreateDefaultInstance(AnalyzerType analyzerType);
 }

@@ -1,5 +1,6 @@
 package org.openelisglobal.storage.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -10,12 +11,15 @@ import java.util.Optional;
 import org.openelisglobal.common.rest.BaseRestController;
 import org.openelisglobal.common.services.IStatusService;
 import org.openelisglobal.common.services.StatusService.SampleStatus;
+import org.openelisglobal.common.util.ControllerUtills;
 import org.openelisglobal.sampleitem.dao.SampleItemDAO;
 import org.openelisglobal.sampleitem.valueholder.SampleItem;
 import org.openelisglobal.storage.dao.SampleStorageAssignmentDAO;
+import org.openelisglobal.storage.dao.SampleStorageMovementDAO;
 import org.openelisglobal.storage.form.SampleAssignmentForm;
 import org.openelisglobal.storage.form.SampleDisposalForm;
 import org.openelisglobal.storage.form.SampleMovementForm;
+import org.openelisglobal.storage.form.SampleUsageForm;
 import org.openelisglobal.storage.service.SampleStorageService;
 import org.openelisglobal.storage.service.StorageDashboardService;
 import org.openelisglobal.storage.service.StorageLocationService;
@@ -56,6 +60,9 @@ public class SampleStorageRestController extends BaseRestController {
 
     @Autowired
     private SampleStorageAssignmentDAO sampleStorageAssignmentDAO;
+
+    @Autowired
+    private SampleStorageMovementDAO sampleStorageMovementDAO;
 
     @Autowired
     private SampleItemDAO sampleItemDAO;
@@ -155,6 +162,7 @@ public class SampleStorageRestController extends BaseRestController {
                 int fromIndex = Math.min(page * size, total);
                 int toIndex = Math.min(fromIndex + size, total);
                 List<Map<String, Object>> pageContent = filtered.subList(fromIndex, toIndex);
+                pageContent.forEach(this::normalizeStatusForResponse);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("items", pageContent);
@@ -175,6 +183,7 @@ public class SampleStorageRestController extends BaseRestController {
                 int fromIndex = Math.min(page * size, total);
                 int toIndex = Math.min(fromIndex + size, total);
                 List<Map<String, Object>> pageContent = all.subList(fromIndex, toIndex);
+                pageContent.forEach(this::normalizeStatusForResponse);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("items", pageContent);
@@ -191,6 +200,29 @@ public class SampleStorageRestController extends BaseRestController {
         } catch (Exception e) {
             logger.error("Error getting SampleItems", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Translate the internal raw-statusId {@code status} field on a sample map to
+     * the spec-compliant enum string before serializing to the client. Spec
+     * contract: specs/001-sample-storage/contracts/storage-api.json:862,885 —
+     * {@code "status": { "enum": ["active", "disposed"] }}. Filter logic in
+     * StorageDashboardServiceImpl still consumes the raw ID via
+     * {@code statusService.matches}; this translation happens only at the response
+     * boundary.
+     */
+    private void normalizeStatusForResponse(Map<String, Object> sample) {
+        Object raw = sample.get("status");
+        if (!(raw instanceof String) || ((String) raw).isEmpty()) {
+            sample.put("status", "active");
+            return;
+        }
+        String statusId = (String) raw;
+        if (statusService.matches(statusId, SampleStatus.Disposed)) {
+            sample.put("status", "disposed");
+        } else {
+            sample.put("status", "active");
         }
     }
 
@@ -217,6 +249,27 @@ public class SampleStorageRestController extends BaseRestController {
             return ResponseEntity.ok(location);
         } catch (Exception e) {
             logger.error("Error getting location for SampleItem: " + sampleItemId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * OGC-649 (Storage audit-trail viewer, follow-up to OGC-60): list all
+     * movement-audit rows for a SampleItem in chronological order. Movements are
+     * insert-only per SampleStorageMovement entity (@Immutable); this endpoint is
+     * read-only. Returns an empty list (200) when the sample has no movements.
+     */
+    @GetMapping("/{sampleItemId}/movements")
+    public ResponseEntity<List<Map<String, Object>>> getSampleItemMovements(@PathVariable String sampleItemId) {
+        try {
+            if (sampleItemId == null || sampleItemId.trim().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            // OGC-738a: delegate to the service so each row also carries
+            // movedByUserName resolved from systemUserService.
+            return ResponseEntity.ok(sampleStorageService.getSampleItemMovementsWithUserNames(sampleItemId));
+        } catch (Exception e) {
+            logger.error("Error getting movements for SampleItem: " + sampleItemId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -504,7 +557,8 @@ public class SampleStorageRestController extends BaseRestController {
      * @return Disposal details including previous location and disposal timestamp
      */
     @PostMapping("/dispose")
-    public ResponseEntity<Map<String, Object>> disposeSampleItem(@Valid @RequestBody SampleDisposalForm form) {
+    public ResponseEntity<Map<String, Object>> disposeSampleItem(@Valid @RequestBody SampleDisposalForm form,
+            HttpServletRequest request) {
         try {
             // Log incoming request for debugging
             if (logger.isDebugEnabled()) {
@@ -512,9 +566,19 @@ public class SampleStorageRestController extends BaseRestController {
                         form.getMethod());
             }
 
+            // OGC-738b: thread the acting user's id through so the global audit
+            // emission (via SampleItemService.update) and the movement row both
+            // reflect who actually performed the disposal.
+            String sysUserId = ControllerUtills.getSysUserId(request);
+            if (sysUserId == null) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("message", "Authentication required for disposal");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+            }
+
             // Service layer handles all business logic
             Map<String, Object> response = sampleStorageService.disposeSampleItem(form.getSampleItemId(),
-                    form.getReason(), form.getMethod(), form.getNotes());
+                    form.getReason(), form.getMethod(), form.getNotes(), sysUserId);
 
             // Log successful disposal
             if (logger.isInfoEnabled()) {
@@ -534,6 +598,58 @@ public class SampleStorageRestController extends BaseRestController {
             logger.error("Error disposing SampleItem", e);
             Map<String, Object> error = new HashMap<>();
             error.put("message", "An error occurred during disposal: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    /**
+     * Record usage against a SampleItem's remaining quantity. POST
+     * /rest/storage/sample-items/record-usage
+     *
+     * <p>
+     * OGC-1026 (Results Entry v3 R7): partial use decrements the remaining quantity
+     * (never below zero); {@code markUsedUp} zeroes it. Exhaustion is remaining ==
+     * 0 — disposal remains an explicit follow-up via /dispose.
+     *
+     * @param form SampleUsageForm containing sampleItemId (flexible identifier),
+     *             amountUsed (decimal string, required unless markUsedUp),
+     *             markUsedUp
+     * @return quantity snapshot: sampleItemId, quantity, remainingQuantity,
+     *         exhausted
+     */
+    @PostMapping("/record-usage")
+    public ResponseEntity<Map<String, Object>> recordSampleUsage(@Valid @RequestBody SampleUsageForm form,
+            HttpServletRequest request) {
+        try {
+            String sysUserId = ControllerUtills.getSysUserId(request);
+            if (sysUserId == null) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("message", "Authentication required for recording usage");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+            }
+
+            java.math.BigDecimal amountUsed = null;
+            if (form.getAmountUsed() != null && !form.getAmountUsed().trim().isEmpty()) {
+                try {
+                    amountUsed = new java.math.BigDecimal(form.getAmountUsed().trim());
+                } catch (NumberFormatException e) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("message", "Amount used must be a number");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                }
+            }
+
+            Map<String, Object> response = sampleStorageService.recordSampleUsage(form.getSampleItemId(), amountUsed,
+                    form.isMarkUsedUp(), sysUserId);
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+        } catch (org.openelisglobal.common.exception.LIMSRuntimeException | IllegalArgumentException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (Exception e) {
+            logger.error("Error recording usage for SampleItem", e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("message", "An error occurred while recording usage: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }

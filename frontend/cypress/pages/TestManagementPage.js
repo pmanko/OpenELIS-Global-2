@@ -8,6 +8,7 @@ class TestManagementPage {
       toggleSwitch: "div.cds--toggle__switch",
       selectTests: "#carbon-multiselect-example-3-input",
       checkAll: "#carbon-multiselect-example-3-item-0-item",
+      checkAllLabel: "label[for='carbon-multiselect-example-3-item-0-item']",
     };
   }
 
@@ -35,11 +36,19 @@ class TestManagementPage {
 
   selectTests() {
     cy.get(this.selectors.selectTests).click();
-    cy.get(this.selectors.checkAll).click();
+    cy.get(this.selectors.checkAllLabel).click();
   }
 
   button(buttonType) {
     cy.contains("button", buttonType).click();
+  }
+
+  // Scope confirm-dialog buttons to the open modal. A bare
+  // cy.contains("button", "Accept") substring-matches side-nav items such as
+  // "Sample Acceptance Checklist", which sit earlier in the DOM and are covered
+  // by the modal.
+  clickModalButton(buttonType) {
+    cy.get(".cds--modal.is-visible").contains("button", buttonType).click();
   }
 }
 

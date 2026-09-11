@@ -155,6 +155,17 @@ public class DateUtil {
         return returnTimestamp;
     }
 
+    public static Timestamp convertStringDateToTimestampLenient(String date) {
+        if (StringUtil.isNullorNill(date)) {
+            return null;
+        }
+        try {
+            return convertStringDateToTimestamp(date);
+        } catch (LIMSRuntimeException timeFormatFailed) {
+            return convertStringDateToTruncatedTimestamp(date);
+        }
+    }
+
     public static Timestamp convertStringDateToTimestampWithPatternNoLocale(String date, String pattern)
             throws LIMSRuntimeException {
         SimpleDateFormat format = new SimpleDateFormat(pattern);
@@ -716,7 +727,7 @@ public class DateUtil {
     }
 
     public static String formatStringDate(String dateStr, String outputFormat) {
-        if (dateStr == null) {
+        if (dateStr == null || dateStr.isBlank()) {
             return "";
         }
         // Define the input date formats

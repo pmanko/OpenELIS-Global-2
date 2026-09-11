@@ -1,8 +1,11 @@
 package org.openelisglobal.sample.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.commons.validator.GenericValidator;
 import org.openelisglobal.analysis.service.AnalysisService;
 import org.openelisglobal.analysis.valueholder.Analysis;
@@ -66,6 +69,9 @@ public class SampleEditServiceImpl implements SampleEditService {
 
     private static final Logger logger = LoggerFactory.getLogger(SampleEditServiceImpl.class);
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     private static final String DEFAULT_ANALYSIS_TYPE = "MANUAL";
     private static final String CANCELED_TEST_STATUS_ID;
     private static final String CANCELED_SAMPLE_STATUS_ID;
@@ -116,7 +122,6 @@ public class SampleEditServiceImpl implements SampleEditService {
     @Override
     public void editSample(SampleEditForm form, HttpServletRequest request, Sample updatedSample, boolean sampleChanged,
             String sysUserId) {
-
         List<SampleEditItem> existingTests = form.getExistingTests() != null ? form.getExistingTests()
                 : new ArrayList<>();
         List<Analysis> cancelAnalysisList = createRemoveList(existingTests, sysUserId);
@@ -153,6 +158,65 @@ public class SampleEditServiceImpl implements SampleEditService {
             sampleChanged = true;
             updatedSample = orderArtifacts.getSample();
         }
+
+        // Update consent fields from form data including audit fields.
+        // A null consentGiven means the form did not include the consent section
+        // (e.g., modify-order flow); preserve the persisted values in that case
+        // rather than wiping the existing consent record.
+        Boolean newConsentGiven = form.getSampleOrderItems().getConsentGiven();
+        boolean consentChanged = false;
+
+        if (newConsentGiven != null) {
+            String newConsentFormReference = form.getSampleOrderItems().getConsentFormReference();
+            String newConsentRecordedAt = form.getSampleOrderItems().getConsentRecordedAt();
+            String newConsentRecordedBy = form.getSampleOrderItems().getConsentRecordedBy();
+
+            // Normalize empty strings to null for consistent comparison
+            if (newConsentFormReference != null && newConsentFormReference.trim().isEmpty()) {
+                newConsentFormReference = null;
+            }
+            if (newConsentRecordedAt != null && newConsentRecordedAt.trim().isEmpty()) {
+                newConsentRecordedAt = null;
+            }
+            if (newConsentRecordedBy != null && newConsentRecordedBy.trim().isEmpty()) {
+                newConsentRecordedBy = null;
+            }
+
+            // Check if any consent field has changed — including audit fields, so
+            // edits that touch only the recorder name/date still mark the sample dirty.
+            Boolean currentConsentGiven = updatedSample.getConsentGiven();
+            String currentConsentFormReference = updatedSample.getConsentFormReference();
+            String currentConsentRecordedBy = updatedSample.getConsentRecordedBy();
+            String currentConsentRecordedAt = updatedSample.getConsentRecordedAt() == null ? null
+                    : DateUtil.convertTimestampToStringDate(updatedSample.getConsentRecordedAt());
+
+            consentChanged = !Objects.equals(currentConsentGiven, newConsentGiven)
+                    || !Objects.equals(currentConsentFormReference, newConsentFormReference)
+                    || !Objects.equals(currentConsentRecordedBy, newConsentRecordedBy)
+                    || !Objects.equals(currentConsentRecordedAt, newConsentRecordedAt);
+
+            // Update consent fields
+            updatedSample.setConsentGiven(newConsentGiven);
+            updatedSample.setConsentFormReference(newConsentFormReference);
+
+            // Update audit fields from form data
+            if (Boolean.TRUE.equals(newConsentGiven)) {
+                // Set audit fields from form data when consent is given
+                if (newConsentRecordedAt != null) {
+                    java.sql.Date parsedDate = DateUtil.convertStringDateToSqlDate(newConsentRecordedAt);
+                    updatedSample.setConsentRecordedAt(new java.sql.Timestamp(parsedDate.getTime()));
+                } else {
+                    updatedSample.setConsentRecordedAt(null);
+                }
+                updatedSample.setConsentRecordedBy(newConsentRecordedBy);
+            } else {
+                // Clear audit fields when consent is explicitly withdrawn
+                updatedSample.setConsentRecordedAt(null);
+                updatedSample.setConsentRecordedBy(null);
+            }
+        }
+
+        sampleChanged = sampleChanged || consentChanged;
         Patient patient = sampleService.getPatient(updatedSample);
         persistProviderData(orderArtifacts);
         SampleHuman sampleHuman = new SampleHuman();
@@ -497,6 +561,9 @@ public class SampleEditServiceImpl implements SampleEditService {
 
     private Analysis getCancelableAnalysis(SampleEditItem sampleEditItem, String sysUserId) {
         Analysis analysis = analysisService.get(sampleEditItem.getAnalysisId());
+        // Detach from Hibernate session so AuditableBaseObjectServiceImpl.update()
+        // can load a clean "old" copy for audit trail comparison
+        entityManager.detach(analysis);
         analysis.setSysUserId(sysUserId);
         analysis.setStatusId(SpringContext.getBean(IStatusService.class).getStatusID(AnalysisStatus.Canceled));
         return analysis;
@@ -546,30 +613,24 @@ public class SampleEditServiceImpl implements SampleEditService {
             // Skip if no storage location specified
             if (storageLocationId == null || storageLocationId.trim().isEmpty() || storageLocationType == null
                     || storageLocationType.trim().isEmpty()) {
+                logger.warn("Cannot assign storage location - SampleItem not persisted yet");
                 continue;
             }
 
             SampleItem sampleItem = sampleTestCollection.item;
             if (sampleItem == null || sampleItem.getId() == null) {
-                logger.warn("Cannot assign storage location - SampleItem not persisted yet");
                 continue;
             }
 
-            try {
-                String sampleItemId = sampleItem.getId();
-
-                logger.info("Assigning storage location for SampleItem {}: locationId={}, locationType={}",
-                        sampleItemId, storageLocationId, storageLocationType);
-
+            String sampleItemId = sampleItem.getId();
+            java.util.Map<String, Object> existing = sampleStorageService.getSampleItemLocation(sampleItemId);
+            boolean alreadyAssigned = existing != null && !existing.isEmpty();
+            if (alreadyAssigned) {
+                sampleStorageService.moveSampleItemWithLocation(sampleItemId, storageLocationId, storageLocationType,
+                        storagePositionCoordinate, "Reassignment on order save", "");
+            } else {
                 sampleStorageService.assignSampleItemWithLocation(sampleItemId, storageLocationId, storageLocationType,
                         storagePositionCoordinate, "Auto-assigned on order creation");
-
-                logger.info("Successfully assigned storage location for SampleItem {}", sampleItemId);
-
-            } catch (Exception e) {
-                // Log error but don't fail the entire order creation
-                logger.error("Failed to assign storage location for SampleItem {}: {}", sampleItem.getId(),
-                        e.getMessage(), e);
             }
         }
     }

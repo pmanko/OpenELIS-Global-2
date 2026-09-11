@@ -35,12 +35,11 @@ jobs:
       artifact_source_mode: ${{ steps.context.outputs.artifact_source_mode }}
       transfer_mode: ${{ steps.context.outputs.transfer_mode }}
       artifact_map_kind: ${{ steps.context.outputs.artifact_map_kind }}
-      include_plugin_jars: ${{ steps.context.outputs.include_plugin_jars }}
       checkpoint_context: ${{ steps.context.outputs.checkpoint_context }}
     steps:
       - name: Download early build context artifact
         id: download_context
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: e2e-build-context-core
           path: /tmp/e2e-build-context
@@ -50,7 +49,7 @@ jobs:
 
       - name: Download transfer-state artifact
         id: download_transfer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: e2e-build-transfer-state
           path: /tmp/e2e-transfer-state
@@ -71,7 +70,6 @@ jobs:
             echo "artifact_source_mode=none" >> "$GITHUB_OUTPUT"
             echo "transfer_mode=none" >> "$GITHUB_OUTPUT"
             echo "artifact_map_kind=base" >> "$GITHUB_OUTPUT"
-            echo "include_plugin_jars=true" >> "$GITHUB_OUTPUT"
             echo "checkpoint_context=03 Checkpoint - E2E" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -115,7 +113,6 @@ jobs:
           echo "artifact_source_mode=$ARTIFACT_SOURCE_MODE" >> "$GITHUB_OUTPUT"
           echo "transfer_mode=$IMAGE_TRANSFER" >> "$GITHUB_OUTPUT"
           echo "artifact_map_kind=base" >> "$GITHUB_OUTPUT"
-          echo "include_plugin_jars=true" >> "$GITHUB_OUTPUT"
           echo "checkpoint_context=03 Checkpoint - E2E" >> "$GITHUB_OUTPUT"
 
           echo "Build context: is_fork=$IS_FORK transfer_mode=$IMAGE_TRANSFER artifact_source_mode=$ARTIFACT_SOURCE_MODE pr=#$PR_NUMBER checkout_ref=$CHECKOUT_REF"
@@ -129,14 +126,16 @@ jobs:
       statuses: write
     steps:
       - name: Post checkpoint status
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
+          retries: 3
           script: |
             const sha = '${{ needs.setup.outputs.status_sha }}';
-            const contextName = '03 Checkpoint - E2E';
+            const contexts = ['03 Checkpoint - E2E',
+              '03 Checkpoint - E2E / build-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}'];
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
-            await github.rest.repos.createCommitStatus({
+            const outcomes = await Promise.allSettled(contexts.map(contextName => github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha,
@@ -144,7 +143,9 @@ jobs:
               context: contextName,
               description: 'Playwright, Cypress, and analyzer-harness suites are running...',
               target_url: runUrl
-            });
+            })));
+            const failures = outcomes.filter(outcome => outcome.status === 'rejected');
+            if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), 'Could not post all E2E statuses');
 
   # ─── Fork Image Publish (No Rebuild) ───────────────────────────────────────
   # Fork PR builds hand off prebuilt Docker images as an artifact. This job
@@ -160,23 +161,15 @@ jobs:
       actions: read
     steps:
       - name: Download fork image handoff from build workflow
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: e2e-image-handoff
           path: /tmp/e2e-image-handoff
           run-id: ${{ needs.setup.outputs.build_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download plugin jars from build workflow
-        uses: actions/download-artifact@v4
-        with:
-          name: e2e-plugin-jars
-          path: /tmp/e2e-plugin-jars
-          run-id: ${{ needs.setup.outputs.build_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -192,7 +185,7 @@ jobs:
 
       - name: Publish handed-off compose images to GHCR
         run: |
-          TAG="sha-${{ needs.setup.outputs.status_sha }}"
+          TAG="sha-${{ needs.setup.outputs.status_sha }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           OWNER_LOWER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
           export TAG OWNER_LOWER
 
@@ -205,31 +198,53 @@ jobs:
             exit 1
           fi
 
+          # Per-image retry handles GHCR's transient `unknown blob` eventual-
+          # consistency errors. xargs output goes to a temp file so xargs's
+          # exit code can be observed directly — piping to `sort` masks it
+          # under the default Actions shell (`bash -e`, no pipefail).
+          : > /tmp/e2e-image-map.raw
+          PUSH_FAILED=false
           xargs -r -I{} -P4 bash -lc '
             image="$1"
             [ -z "$image" ] && exit 0
-            if docker image inspect "$image" >/dev/null 2>&1; then
-              image_repo="$(echo "$image" | tr "[:upper:]" "[:lower:]" | sed "s|[^a-z0-9._/-]|-|g")"
-              ghcr_image="ghcr.io/${OWNER_LOWER}/openelis-global-2/e2e-cache/${image_repo}:${TAG}"
-              docker tag "$image" "$ghcr_image"
-              push_err=$(docker push "$ghcr_image" 2>&1) && {
-                printf "%s|%s\n" "$image" "$ghcr_image"
-              } || {
-                echo "PUSH FAILED ($image): $push_err" >&2
-                exit 1
-              }
-            else
+            if ! docker image inspect "$image" >/dev/null 2>&1; then
               echo "WARN: skipping $image (not built locally)" >&2
+              exit 0
             fi
-          ' _ {} < /tmp/e2e-image-handoff/e2e-images-full.txt | sort -u > /tmp/e2e-image-map.txt
+            image_repo="$(echo "$image" | tr "[:upper:]" "[:lower:]" | sed "s|[^a-z0-9._/-]|-|g")"
+            ghcr_image="ghcr.io/${OWNER_LOWER}/openelis-global-2/e2e-cache/${image_repo}:${TAG}"
+            docker tag "$image" "$ghcr_image"
+            attempt=1
+            while [ $attempt -le 3 ]; do
+              if push_err=$(docker push "$ghcr_image" 2>&1); then
+                digest="$(printf "%s\n" "$push_err" | sed -nE "s/.*digest: (sha256:[a-f0-9]{64}).*/\\1/p" | tail -1)"
+                if [ -z "$digest" ]; then
+                  echo "PUSH did not report an immutable digest for $image" >&2
+                  exit 1
+                fi
+                printf "%s|%s@%s\n" "$image" "${ghcr_image%:*}" "$digest"
+                exit 0
+              fi
+              echo "PUSH attempt $attempt failed ($image): $push_err" >&2
+              attempt=$((attempt + 1))
+              [ $attempt -le 3 ] && sleep $((attempt * 5))
+            done
+            echo "PUSH FAILED after 3 attempts ($image)" >&2
+            exit 1
+          ' _ {} < /tmp/e2e-image-handoff/e2e-images-full.txt > /tmp/e2e-image-map.raw || PUSH_FAILED=true
+
+          sort -u /tmp/e2e-image-map.raw > /tmp/e2e-image-map.txt
+
+          if [ "$PUSH_FAILED" = "true" ] || [ ! -s /tmp/e2e-image-map.txt ]; then
+            echo "::error::GHCR push incomplete — see PUSH FAILED lines above"
+            echo "Map contents so far:"
+            cat /tmp/e2e-image-map.txt || true
+            exit 1
+          fi
 
           awk -F'|' 'NR==FNR {base[$1]=1; next} ($1 in base) {print}' \
             /tmp/e2e-image-handoff/e2e-images-base.txt /tmp/e2e-image-map.txt > /tmp/e2e-image-map-base.txt
 
-          if [ ! -s /tmp/e2e-image-map.txt ]; then
-            echo "::error::No images were pushed to GHCR"
-            exit 1
-          fi
           if [ ! -s /tmp/e2e-image-map-base.txt ]; then
             echo "WARN: no base compose image mappings found; falling back to full image map."
             cp /tmp/e2e-image-map.txt /tmp/e2e-image-map-base.txt
@@ -237,16 +252,8 @@ jobs:
           echo "Pushed image mappings:"
           cat /tmp/e2e-image-map.txt
 
-      - name: Upload plugin jars artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-plugin-jars
-          path: /tmp/e2e-plugin-jars/*.jar
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Upload Docker image map artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-image-map
           path: /tmp/e2e-image-map.txt
@@ -254,7 +261,7 @@ jobs:
           retention-days: 1
 
       - name: Upload base Docker image map artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-image-map-base
           path: /tmp/e2e-image-map-base.txt
@@ -296,7 +303,6 @@ jobs:
       build_run_id: ${{ needs.setup.outputs.build_run_id }}
       artifact_source_mode: ${{ needs.setup.outputs.artifact_source_mode }}
       artifact_map_kind: ${{ needs.setup.outputs.artifact_map_kind }}
-      include_plugin_jars: ${{ needs.setup.outputs.include_plugin_jars }}
       is_fork: ${{ needs.setup.outputs.is_fork }}
       pr_number: ${{ needs.setup.outputs.pr_number }}
       checkpoint_context: ${{ needs.setup.outputs.checkpoint_context }}
@@ -371,11 +377,13 @@ jobs:
       statuses: write
     steps:
       - name: Update checkpoint status
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
+          retries: 3
           script: |
             const sha = '${{ needs.setup.outputs.status_sha }}';
-            const contextName = '03 Checkpoint - E2E';
+            const contexts = ['03 Checkpoint - E2E',
+              '03 Checkpoint - E2E / build-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}'];
             const gateResult = '${{ needs.e2e-gate.result }}';
             const artifactSourceMode = '${{ needs.setup.outputs.artifact_source_mode }}';
             const isFork = '${{ needs.setup.outputs.is_fork }}' === 'true';
@@ -394,7 +402,7 @@ jobs:
               state = 'failure';
               description = 'One or more E2E suites failed';
             }
-            await github.rest.repos.createCommitStatus({
+            const outcomes = await Promise.allSettled(contexts.map(contextName => github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha,
@@ -402,4 +410,6 @@ jobs:
               context: contextName,
               description,
               target_url: runUrl
-            });
+            })));
+            const failures = outcomes.filter(outcome => outcome.status === 'rejected');
+            if (failures.length) throw new AggregateError(failures.map(outcome => outcome.reason), 'Could not post all E2E statuses');

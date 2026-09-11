@@ -1,7 +1,6 @@
 # Unified Playwright E2E executor — parameterized for both core and harness.
-# Called by e2e-authoritative-reusable.yml twice: once for core projects
-# (build.docker-compose.yml only) and once for harness projects (with
-# analyzer bridge overlay). Runs test shards, merges blob reports into
+# Called for core and analyzer harness projects.
+# Runs test shards, merges blob reports into
 # a single HTML report, and enforces a gate.
 name: E2E / Playwright (Reusable)
 
@@ -16,18 +15,23 @@ on:
         description: "Prefix for artifact names (e.g. core, harness)"
         required: true
         type: string
+      shard_indices:
+        description: "JSON array of shard indices; use [1] for a single story"
+        required: false
+        type: string
+        default: "[1,2]"
       compose_files:
         description: "Comma-separated Docker Compose files to start"
         required: false
         type: string
         default: "build.docker-compose.yml"
       fixture_mode:
-        description: "Fixture loading mode: core (SQL files) or harness (load-test-fixtures.sh)"
+        description: "Fixture loading mode: core or harness via unified load-test-fixtures.sh"
         required: false
         type: string
         default: "core"
       setup_analyzer_harness:
-        description: "Run analyzer harness setup (plugin jars, seeding, cert validation)"
+        description: "Run analyzer harness setup (runtime, seeding, cert validation)"
         required: false
         type: boolean
         default: false
@@ -59,9 +63,71 @@ on:
         default: ""
 
 jobs:
+  # ─── Pre-warm Playwright browser cache ─────────────────────────────────────
+  # Runs once per workflow invocation so the 4 parallel shards (2 here × 2
+  # callers — core and harness) don't all hammer the Playwright CDN on a cold
+  # cache. On a warm cache this job finishes in ~10s with no network I/O
+  # beyond the cache backend. The shards' own `actions/cache` step restores
+  # the key this job saves.
+  pre-warm-playwright:
+    name: Pre-warm Playwright cache
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
+          # actions/checkout@v6 (retagged 2026-07-20) refuses fork-PR checkout in
+          # a workflow_run context. This executor intentionally runs PR specs to
+          # validate them, so opt back in. Follow-up: harden so fork code never
+          # runs with base secrets, then this flag can be removed.
+          allow-unsafe-pr-checkout: true
+
+      - name: Restore Playwright browser cache
+        id: pw-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Setup Node.js
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npm ci --legacy-peer-deps
+        working-directory: frontend
+
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::Playwright install attempt $attempt"
+            if timeout --kill-after=30s 6m npx playwright install --only-shell chromium; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "Attempt $attempt failed or timed out; retrying after 15s..."
+            sleep 15
+          done
+          echo "Playwright install failed after 3 attempts" >&2
+          exit 1
+        working-directory: frontend
+
   # ─── Test Shards ────────────────────────────────────────────────────────────
   test-shards:
-    name: ${{ inputs.artifact_prefix }} ${{ matrix.shard_index }}/2
+    name: ${{ inputs.artifact_prefix }} ${{ matrix.shard_index }}/${{ strategy.job-total }}
+    needs: pre-warm-playwright
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -70,14 +136,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard_index: [1, 2]
+        shard_index: ${{ fromJSON(inputs.shard_indices) }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
           submodules: recursive
           persist-credentials: false
+          # actions/checkout@v6 (retagged 2026-07-20) refuses fork-PR checkout in
+          # a workflow_run context. This executor intentionally runs PR specs to
+          # validate them, so opt back in. Follow-up: harden so fork code never
+          # runs with base secrets, then this flag can be removed.
+          allow-unsafe-pr-checkout: true
 
       - name: Configure swap for OOM resilience
         run: |
@@ -89,18 +160,18 @@ jobs:
           sudo swapon /swapfile 2>/dev/null || true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: frontend
 
       - name: Restore Playwright browser cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
@@ -108,7 +179,31 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
-        run: npx playwright install --only-shell chromium --with-deps
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::Playwright install attempt $attempt"
+            # A timed-out --with-deps attempt orphans apt-get still holding the
+            # dpkg lock, which fails every subsequent retry with exit 100.
+            # Reclaim the lock before retrying so a slow-mirror attempt 1 does
+            # not doom the whole step.
+            if [ "$attempt" -gt 1 ]; then
+              sudo pkill -9 -x apt-get 2>/dev/null || true
+              sudo pkill -9 -x dpkg 2>/dev/null || true
+              sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock \
+                /var/lib/apt/lists/lock 2>/dev/null || true
+              sudo dpkg --configure -a 2>/dev/null || true
+            fi
+            if timeout --kill-after=30s 6m npx playwright install --only-shell chromium --with-deps; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "Attempt $attempt failed or timed out; retrying after 15s..."
+            sleep 15
+          done
+          echo "Playwright install failed after 3 attempts" >&2
+          exit 1
         working-directory: frontend
 
       - name: Prepare .env from template
@@ -118,7 +213,7 @@ jobs:
 
       - name: Download image map (cross-run)
         if: inputs.artifact_source_mode == 'cross_run'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{ inputs.setup_analyzer_harness && 'e2e-image-map' || 'e2e-image-map-base' }}
           path: /tmp/e2e-image-map
@@ -127,39 +222,15 @@ jobs:
 
       - name: Download image map (same-run)
         if: inputs.artifact_source_mode == 'same_run'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{ inputs.setup_analyzer_harness && 'e2e-image-map' || 'e2e-image-map-base' }}
           path: /tmp/e2e-image-map
 
-      - name: Download plugin jars (cross-run)
-        if: inputs.setup_analyzer_harness && inputs.artifact_source_mode == 'cross_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: e2e-plugin-jars
-          path: /tmp/e2e-plugin-jars
-          run-id: ${{ inputs.build_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download plugin jars (same-run)
-        if: inputs.setup_analyzer_harness && inputs.artifact_source_mode == 'same_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: e2e-plugin-jars
-          path: /tmp/e2e-plugin-jars
-
-      - name: Restore plugin jars for runtime loading
-        if: inputs.setup_analyzer_harness
-        run: |
-          mkdir -p volume/plugins
-          rm -rf volume/plugins/*
-          cp /tmp/e2e-plugin-jars/*.jar volume/plugins/
-          ls -lah volume/plugins
-
       # ── Docker Setup ────────────────────────────────────────────────────────
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -181,6 +252,10 @@ jobs:
       # ── Container Startup ───────────────────────────────────────────────────
 
       - name: Start containers (no rebuild)
+        env:
+          # The fixture provisioner is intentionally disabled in normal deployments.
+          # Core E2E uses the ADMIN-gated endpoint to build its disposable scenario.
+          OE_UAT_SCENARIOS_ENABLED: "true"
         run: |
           COMPOSE_CMD=(docker compose)
           IFS=',' read -ra FILES <<< "${{ inputs.compose_files }}"
@@ -217,22 +292,13 @@ jobs:
 
       # ── Fixture Loading ─────────────────────────────────────────────────────
 
-      - name: Load core SQL fixtures
+      - name: Load core fixtures
         if: inputs.fixture_mode == 'core'
-        run: |
-          docker exec -i openelisglobal-database \
-            psql -U clinlims -d clinlims -v ON_ERROR_STOP=1 \
-            < src/test/resources/e2e-foundational-data.sql
-          docker exec -i openelisglobal-database \
-            psql -U clinlims -d clinlims -v ON_ERROR_STOP=1 \
-            < src/test/resources/analyzer-harness-e2e.sql
-          docker exec -i openelisglobal-database \
-            psql -U clinlims -d clinlims -v ON_ERROR_STOP=1 \
-            < src/test/resources/fixtures/file-import-e2e.sql
+        run: ./src/test/resources/load-test-fixtures.sh --profile=core --no-verify
 
       - name: Load harness fixtures
         if: inputs.fixture_mode == 'harness'
-        run: ./src/test/resources/load-test-fixtures.sh --analyzers=full --no-verify
+        run: ./src/test/resources/load-test-fixtures.sh --profile=harness --no-verify
 
       - name: Create core analyzer import directories
         if: inputs.fixture_mode == 'core'
@@ -292,7 +358,7 @@ jobs:
           for p in "${PROJECTS[@]}"; do
             CMD+=("--project=$p")
           done
-          CMD+=("--shard=${{ matrix.shard_index }}/2")
+          CMD+=("--shard=${{ matrix.shard_index }}/${{ strategy.job-total }}")
           if [[ "${{ inputs.setup_analyzer_harness }}" == "true" ]]; then
             CMD+=("--workers=1")
           fi
@@ -304,9 +370,9 @@ jobs:
           BASE_URL: https://localhost
           TEST_USER: ${{ inputs.test_user || vars.TEST_USER || 'admin' }}
           TEST_PASS: ${{ inputs.test_pass || vars.TEST_PASS || 'adminADMIN!' }}
+          ANALYZER_INGRESS_USER: ${{ inputs.test_user || vars.TEST_USER || 'admin' }}
+          ANALYZER_INGRESS_PASS: ${{ inputs.test_pass || vars.TEST_PASS || 'adminADMIN!' }}
           ANALYZER_HARNESS: ${{ inputs.setup_analyzer_harness && 'true' || '' }}
-          FILE_IMPORT_POLL_MS: ${{ inputs.setup_analyzer_harness && '1000' || '' }}
-          FILE_IMPORT_DROP_BUFFER_MS: ${{ inputs.setup_analyzer_harness && '15000' || '' }}
 
       - name: Memory snapshot (post-test) + monitor dump
         if: ${{ !cancelled() }}
@@ -325,7 +391,7 @@ jobs:
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ inputs.artifact_prefix }}-blob-report-${{ matrix.shard_index }}
           path: frontend/blob-report
@@ -334,7 +400,7 @@ jobs:
 
       - name: Upload failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ inputs.artifact_prefix }}-screenshots-${{ matrix.shard_index }}
           path: frontend/test-results/**/test-failed-*.png
@@ -343,7 +409,7 @@ jobs:
 
       - name: Upload test traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ inputs.artifact_prefix }}-traces-${{ matrix.shard_index }}
           path: frontend/test-results/**/trace.zip
@@ -381,19 +447,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
           persist-credentials: false
+          # actions/checkout@v6 (retagged 2026-07-20) refuses fork-PR checkout in
+          # a workflow_run context. This executor intentionally runs PR specs to
+          # validate them, so opt back in. Follow-up: harden so fork code never
+          # runs with base secrets, then this flag can be removed.
+          allow-unsafe-pr-checkout: true
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
       - name: Download blob reports from shards
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: frontend/all-blob-reports
           pattern: ${{ inputs.artifact_prefix }}-blob-report-*
@@ -426,7 +497,7 @@ jobs:
 
       - name: Upload merged HTML report
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ inputs.artifact_prefix }}-playwright-report-html-attempt-${{ github.run_attempt }}
           path: frontend/playwright-report/

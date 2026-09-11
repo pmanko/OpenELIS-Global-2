@@ -20,6 +20,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashMap;
@@ -65,6 +66,8 @@ public class SampleOrderItem implements Serializable {
     @ValidAccessionNumber(groups = { SamplePatientEntryForm.SamplePatientEntry.class, SamplePatientEntryBatch.class,
             SampleEditForm.SampleEdit.class })
     private String labNo;
+
+    private String requiredBy;
 
     @OptionalNotBlank(formFields = { Field.SampleEntryUseRequestDate }, groups = {
             SamplePatientEntryForm.SamplePatientEntry.class, SampleEditForm.SampleEdit.class })
@@ -154,6 +157,52 @@ public class SampleOrderItem implements Serializable {
             SampleEditForm.SampleEdit.class })
     private String providerEmail;
 
+    // Requesting Organization contact info (Environmental/Vector) — the
+    // organization itself is addressed via referringSite*; these are the
+    // org's own phone/fax/email, distinct from any Requestor contact person.
+    @Pattern(regexp = ValidationHelper.PHONE_REGEX, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String referringSitePhone;
+
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String referringSiteFax;
+
+    @Email(groups = { SamplePatientEntryForm.SamplePatientEntry.class, SamplePatientEntryBatch.class,
+            SampleEditForm.SampleEdit.class })
+    private String referringSiteEmail;
+
+    // Requestor contact person (Environmental/Vector) — independent of the
+    // Requesting Organization above; at least one of the two is required
+    // (enforced in SamplePatientEntryRestController for env/vector workflows).
+    @Pattern(regexp = ValidationHelper.ID_REGEX, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String requestorPersonId;
+
+    @ValidName(nameType = NameType.FIRST_NAME, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String requestorFirstName;
+
+    @ValidName(nameType = NameType.LAST_NAME, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String requestorLastName;
+
+    @Pattern(regexp = ValidationHelper.PHONE_REGEX, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String requestorPhone;
+
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String requestorFax;
+
+    @Email(groups = { SamplePatientEntryForm.SamplePatientEntry.class, SamplePatientEntryBatch.class,
+            SampleEditForm.SampleEdit.class })
+    private String requestorEmail;
+
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String requestorDepartment;
+
     @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
             SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
     private String facilityAddressStreet;
@@ -231,6 +280,17 @@ public class SampleOrderItem implements Serializable {
      */
     private Map<String, Object> environmentalFields = new HashMap<>();
 
+    /**
+     * A deliberate, recorded decision to order without a patient (OGC-1201 AL).
+     * Carried on the order form so the server can accept the order and record why,
+     * instead of the caller fabricating a patient to satisfy the gate.
+     */
+    private boolean noPatientOverride;
+
+    private String noPatientReasonCode;
+
+    private String noPatientReason;
+
     private boolean isEQASample;
     private String eqaProgramId;
     private String eqaProviderOrganizationId;
@@ -238,6 +298,32 @@ public class SampleOrderItem implements Serializable {
     private String eqaParticipantId;
     private String eqaDeadline;
     private String eqaPriority;
+
+    // Informed consent fields
+    private Boolean consentGiven;
+
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    @Size(max = 100, message = "{error.informedConsent.formReferenceMaxLength}", groups = {
+            SamplePatientEntryForm.SamplePatientEntry.class, SamplePatientEntryBatch.class,
+            SampleEditForm.SampleEdit.class })
+    @Pattern(regexp = "^[a-zA-Z0-9\\- ]*$", message = "{error.informedConsent.formReferenceInvalidChars}", groups = {
+            SamplePatientEntryForm.SamplePatientEntry.class, SamplePatientEntryBatch.class,
+            SampleEditForm.SampleEdit.class })
+    private String consentFormReference;
+
+    // Audit fields for consent (form inputs)
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    @ValidDate(relative = DateRelation.PAST, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    private String consentRecordedAt;
+
+    @SafeHtml(level = SafeHtml.SafeListLevel.NONE, groups = { SamplePatientEntryForm.SamplePatientEntry.class,
+            SamplePatientEntryBatch.class, SampleEditForm.SampleEdit.class })
+    @Size(max = 255, groups = { SamplePatientEntryForm.SamplePatientEntry.class, SamplePatientEntryBatch.class,
+            SampleEditForm.SampleEdit.class })
+    private String consentRecordedBy;
 
     // for display
     private List<IdValuePair> priorityList;
@@ -306,6 +392,14 @@ public class SampleOrderItem implements Serializable {
 
     public void setLabNo(String labNo) {
         this.labNo = labNo;
+    }
+
+    public String getRequiredBy() {
+        return requiredBy;
+    }
+
+    public void setRequiredBy(String requiredBy) {
+        this.requiredBy = requiredBy;
     }
 
     public String getRequestDate() {
@@ -450,6 +544,86 @@ public class SampleOrderItem implements Serializable {
 
     public void setProviderEmail(String providerEmail) {
         this.providerEmail = providerEmail;
+    }
+
+    public String getReferringSitePhone() {
+        return referringSitePhone;
+    }
+
+    public void setReferringSitePhone(String referringSitePhone) {
+        this.referringSitePhone = referringSitePhone;
+    }
+
+    public String getReferringSiteFax() {
+        return referringSiteFax;
+    }
+
+    public void setReferringSiteFax(String referringSiteFax) {
+        this.referringSiteFax = referringSiteFax;
+    }
+
+    public String getReferringSiteEmail() {
+        return referringSiteEmail;
+    }
+
+    public void setReferringSiteEmail(String referringSiteEmail) {
+        this.referringSiteEmail = referringSiteEmail;
+    }
+
+    public String getRequestorPersonId() {
+        return requestorPersonId;
+    }
+
+    public void setRequestorPersonId(String requestorPersonId) {
+        this.requestorPersonId = requestorPersonId;
+    }
+
+    public String getRequestorFirstName() {
+        return requestorFirstName;
+    }
+
+    public void setRequestorFirstName(String requestorFirstName) {
+        this.requestorFirstName = requestorFirstName;
+    }
+
+    public String getRequestorLastName() {
+        return requestorLastName;
+    }
+
+    public void setRequestorLastName(String requestorLastName) {
+        this.requestorLastName = requestorLastName;
+    }
+
+    public String getRequestorPhone() {
+        return requestorPhone;
+    }
+
+    public void setRequestorPhone(String requestorPhone) {
+        this.requestorPhone = requestorPhone;
+    }
+
+    public String getRequestorFax() {
+        return requestorFax;
+    }
+
+    public void setRequestorFax(String requestorFax) {
+        this.requestorFax = requestorFax;
+    }
+
+    public String getRequestorEmail() {
+        return requestorEmail;
+    }
+
+    public void setRequestorEmail(String requestorEmail) {
+        this.requestorEmail = requestorEmail;
+    }
+
+    public String getRequestorDepartment() {
+        return requestorDepartment;
+    }
+
+    public void setRequestorDepartment(String requestorDepartment) {
+        this.requestorDepartment = requestorDepartment;
     }
 
     public String getFacilityAddressStreet() {
@@ -628,6 +802,30 @@ public class SampleOrderItem implements Serializable {
         this.programId = programId;
     }
 
+    public boolean isNoPatientOverride() {
+        return noPatientOverride;
+    }
+
+    public void setNoPatientOverride(boolean noPatientOverride) {
+        this.noPatientOverride = noPatientOverride;
+    }
+
+    public String getNoPatientReasonCode() {
+        return noPatientReasonCode;
+    }
+
+    public void setNoPatientReasonCode(String noPatientReasonCode) {
+        this.noPatientReasonCode = noPatientReasonCode;
+    }
+
+    public String getNoPatientReason() {
+        return noPatientReason;
+    }
+
+    public void setNoPatientReason(String noPatientReason) {
+        this.noPatientReason = noPatientReason;
+    }
+
     public boolean getIsEQASample() {
         return isEQASample;
     }
@@ -705,5 +903,37 @@ public class SampleOrderItem implements Serializable {
             return (String) value;
         }
         return value.toString();
+    }
+
+    public Boolean getConsentGiven() {
+        return consentGiven;
+    }
+
+    public void setConsentGiven(Boolean consentGiven) {
+        this.consentGiven = consentGiven;
+    }
+
+    public String getConsentFormReference() {
+        return consentFormReference;
+    }
+
+    public void setConsentFormReference(String consentFormReference) {
+        this.consentFormReference = consentFormReference;
+    }
+
+    public String getConsentRecordedAt() {
+        return consentRecordedAt;
+    }
+
+    public void setConsentRecordedAt(String consentRecordedAt) {
+        this.consentRecordedAt = consentRecordedAt;
+    }
+
+    public String getConsentRecordedBy() {
+        return consentRecordedBy;
+    }
+
+    public void setConsentRecordedBy(String consentRecordedBy) {
+        this.consentRecordedBy = consentRecordedBy;
     }
 }
